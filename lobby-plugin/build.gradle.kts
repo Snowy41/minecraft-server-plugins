@@ -11,6 +11,9 @@ java {
 }
 
 dependencies {
+    // Core Plugin dependency - THIS IS WHAT'S MISSING!
+    compileOnly(project(":core-plugin"))
+
     // API Module
     implementation(project(":api-module"))
 

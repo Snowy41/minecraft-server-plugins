@@ -23,8 +23,8 @@ public class LobbyScoreboard {
     public LobbyScoreboard(@NotNull Player player, @NotNull Component title) {
         this.player = player;
 
-        // Create new scoreboard
-        ScoreboardManager manager = Bukkit.getScoreboardManager();
+        // Create new scoreboard - use Bukkit's ScoreboardManager
+        org.bukkit.scoreboard.ScoreboardManager manager = Bukkit.getScoreboardManager();
         this.scoreboard = manager.getNewScoreboard();
 
         // Create objective

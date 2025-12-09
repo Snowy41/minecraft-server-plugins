@@ -83,6 +83,17 @@ public class PartitionManager {
 
         plugin.getLogger().info("Loading partition: " + partitionId);
 
+        // IMPORTANT: Ensure all worlds exist and are loaded
+        plugin.getLogger().info("Ensuring worlds are loaded for partition: " + partitionId);
+        for (String worldName : settings.getWorlds()) {
+            World world = worldManager.ensureWorldLoaded(worldName);
+            if (world == null) {
+                plugin.getLogger().severe("Failed to load/create world: " + worldName);
+                plugin.getLogger().severe("Partition load aborted: " + partitionId);
+                return false;
+            }
+        }
+
         // Create partition instance
         Partition partition = new Partition(
                 settings.getId(),
@@ -126,23 +137,37 @@ public class PartitionManager {
 
         plugin.getLogger().info("Unloading partition: " + partitionId);
 
-        // Move all players out of this partition
+        // Move all players out of this partition (MUST BE SYNC!)
         List<Player> playersInPartition = getPlayersInPartition(partitionId);
         if (!playersInPartition.isEmpty()) {
             plugin.getLogger().info("Moving " + playersInPartition.size() + " players out of partition");
 
             // Find a default partition to move them to
-            Partition defaultPartition = getDefaultPartition();
+            Partition defaultPartition = getDefaultPartition(partitionId);
+
             if (defaultPartition != null) {
+                // MUST teleport synchronously on main thread!
                 for (Player player : playersInPartition) {
-                    movePlayerToPartition(player, defaultPartition.getId());
+                    // Schedule sync teleport
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        movePlayerToPartition(player, defaultPartition.getId());
+                    });
+                }
+
+                // Wait a bit for teleports to complete
+                try {
+                    Thread.sleep(500);
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
                 }
             } else {
-                // No default partition, kick players
+                // No default partition, kick players (also must be sync)
                 for (Player player : playersInPartition) {
-                    player.kick(plugin.getMiniMessage().deserialize(
-                            "<red>The partition you were in has been unloaded!"
-                    ));
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        player.kick(plugin.getMiniMessage().deserialize(
+                                "<red>The partition you were in has been unloaded!"
+                        ));
+                    });
                 }
             }
         }
@@ -164,6 +189,7 @@ public class PartitionManager {
 
     /**
      * Restarts a partition (unload then load).
+     * MUST be called synchronously on main thread!
      */
     public boolean restartPartition(@NotNull String partitionId) {
         plugin.getLogger().info("Restarting partition: " + partitionId);
@@ -237,6 +263,7 @@ public class PartitionManager {
 
     /**
      * Moves a player to a specific partition.
+     * MUST be called from main thread!
      */
     public boolean movePlayerToPartition(@NotNull Player player, @NotNull String partitionId) {
         Partition partition = partitions.get(partitionId);
@@ -251,10 +278,10 @@ public class PartitionManager {
             return false;
         }
 
-        // Update cached partition
+        // Update cached partition BEFORE teleporting
         playerPartitions.put(player.getUniqueId(), partitionId);
 
-        // Teleport player
+        // Teleport player (MUST be on main thread!)
         player.teleport(spawnLocation);
 
         plugin.getLogger().info("Moved player " + player.getName() + " to partition: " + partitionId);
@@ -307,11 +334,14 @@ public class PartitionManager {
     }
 
     /**
-     * Gets the default partition (first enabled partition).
+     * Gets the default partition (first enabled partition that isn't the one being unloaded).
      */
     @Nullable
-    public Partition getDefaultPartition() {
-        return partitions.values().stream().findFirst().orElse(null);
+    public Partition getDefaultPartition(String excludePartitionId) {
+        return partitions.values().stream()
+                .filter(p -> !p.getId().equals(excludePartitionId))
+                .findFirst()
+                .orElse(null);
     }
 
     /**

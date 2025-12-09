@@ -8,7 +8,7 @@ import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Manages world time to keep it always day (if enabled).
- * Runs a task that checks and sets time every second.
+ * Runs a task that checks and sets time every 5 seconds.
  */
 public class TimeManager {
 
@@ -26,27 +26,38 @@ public class TimeManager {
      */
     public void startTimeTask() {
         if (!config.getProtectionConfig().isAlwaysDay()) {
-            return; // Don't start if always-day is disabled
+            plugin.getLogger().info("Time manager not started - always-day is disabled");
+            return;
         }
 
         if (timeTask != null) {
             timeTask.cancel();
         }
 
-        // Run every second (20 ticks)
-        timeTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
-            long targetTime = config.getProtectionConfig().getDayTime();
+        long targetTime = config.getProtectionConfig().getDayTime();
 
+        // Run every 5 seconds (100 ticks) - more frequent than before
+        timeTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             // Set time for all worlds (or just spawn world)
             for (World world : Bukkit.getWorlds()) {
-                if (world.getTime() != targetTime) {
+                // Only set time if it's significantly different
+                long currentTime = world.getTime();
+
+                // Normalize times to 0-24000 range for comparison
+                long normalizedCurrent = currentTime % 24000;
+                long normalizedTarget = targetTime % 24000;
+
+                // Only update if time is different (with small tolerance)
+                if (Math.abs(normalizedCurrent - normalizedTarget) > 100) {
                     world.setTime(targetTime);
+                    plugin.getLogger().fine("Reset time in world " + world.getName() +
+                            " from " + normalizedCurrent + " to " + normalizedTarget);
                 }
             }
-        }, 0L, 20L);
+        }, 0L, 100L); // 0 delay, run every 100 ticks (5 seconds)
 
-        plugin.getLogger().info("Time manager started - keeping time at " +
-                config.getProtectionConfig().getDayTime());
+        plugin.getLogger().info("Time manager started - keeping time at " + targetTime +
+                " (updating every 5 seconds)");
     }
 
     /**
@@ -56,6 +67,7 @@ public class TimeManager {
         if (timeTask != null) {
             timeTask.cancel();
             timeTask = null;
+            plugin.getLogger().info("Time manager stopped");
         }
     }
 }

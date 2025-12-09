@@ -213,7 +213,11 @@ public class LobbyProtectionListener implements Listener {
     /**
      * Keep time always day if configured.
      * Uses TimeSkipEvent (Paper-specific event when time naturally changes).
-     * IMPORTANT: We only CANCEL the event here. The TimeManager handles setting the time.
+     * IMPORTANT: We only CANCEL natural time progression here.
+     * The TimeManager task handles setting the time.
+     *
+     * We DON'T cancel command-initiated time changes (like /time set)
+     * because those are TimeSkipEvent.Reason.COMMAND
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onTimeSkip(org.bukkit.event.world.TimeSkipEvent event) {
@@ -221,7 +225,12 @@ public class LobbyProtectionListener implements Listener {
             return;
         }
 
-        // Cancel natural time progression (sleeping, commands, etc.)
+        // Allow commands to change time (for admins/OPs)
+        if (event.getSkipReason() == org.bukkit.event.world.TimeSkipEvent.SkipReason.COMMAND) {
+            return; // Allow /time set commands
+        }
+
+        // Cancel natural time progression (sleeping, etc.)
         // The TimeManager task will keep the time at the configured value
         event.setCancelled(true);
     }

@@ -2,6 +2,7 @@ package com.yourserver.partition;
 
 import com.yourserver.partition.command.PartitionCommand;
 import com.yourserver.partition.config.PartitionConfig;
+import com.yourserver.partition.listener.PartitionIsolationListener;
 import com.yourserver.partition.listener.PlayerWorldChangeListener;
 import com.yourserver.partition.listener.PluginIsolationListener;
 import com.yourserver.partition.manager.PartitionManager;
@@ -60,6 +61,10 @@ public class PartitionPlugin extends JavaPlugin {
                     new PluginIsolationListener(pluginIsolationManager),
                     this
             );
+            getServer().getPluginManager().registerEvents(
+                    new PartitionIsolationListener(this, partitionManager),
+                    this
+            );
             getLogger().info("Event listeners registered");
 
             // 6. Register commands
@@ -67,6 +72,9 @@ public class PartitionPlugin extends JavaPlugin {
             getCommand("partition").setExecutor(partitionCommand);
             getCommand("partition").setTabCompleter(partitionCommand);
             getLogger().info("Commands registered");
+
+            // 7. Log isolation settings
+            logIsolationSettings();
 
             getLogger().info("PartitionPlugin enabled successfully!");
 
@@ -110,6 +118,21 @@ public class PartitionPlugin extends JavaPlugin {
         partitionManager.loadAllPartitions();
 
         getLogger().info("Configuration reloaded");
+        logIsolationSettings();
+    }
+
+    /**
+     * Logs the current isolation settings on startup.
+     */
+    private void logIsolationSettings() {
+        PartitionConfig.IsolationSettings settings = config.getIsolationSettings();
+
+        getLogger().info("=== Partition Isolation Settings ===");
+        getLogger().info("  Chat Isolation: " + (settings.isChatIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
+        getLogger().info("  Tab List Isolation: " + (settings.isTablistIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
+        getLogger().info("  Command Isolation: " + (settings.isCommandIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
+        getLogger().info("  World Border Isolation: " + (settings.isWorldBorderIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
+        getLogger().info("====================================");
     }
 
     // ===== Public API =====

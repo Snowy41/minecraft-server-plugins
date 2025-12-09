@@ -23,18 +23,6 @@ import java.util.stream.Collectors;
 
 /**
  * Main command handler for partition management.
- *
- * Commands:
- * /partition list - List all partitions
- * /partition info <partition> - Show partition details
- * /partition tp <partition> - Teleport to a partition
- * /partition restart <partition> - Restart a partition
- * /partition reload - Reload configuration
- * /partition worlds - List all worlds and their partitions
- * /partition plugins <partition> - List plugins in a partition
- * /partition add world <worldname> [partition] - Add current/named world to partition
- * /partition enable plugin <plugin> <partition> - Enable plugin for partition
- * /partition disable plugin <plugin> <partition> - Disable plugin for partition
  */
 public class PartitionCommand implements CommandExecutor, TabCompleter {
 
@@ -232,19 +220,17 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("Restarting partition: " + partition.getName() + "...",
                 NamedTextColor.YELLOW));
 
-        // Restart asynchronously
-        Bukkit.getScheduler().runTaskAsynchronously(plugin, () -> {
+        // MUST restart synchronously on main thread!
+        Bukkit.getScheduler().runTask(plugin, () -> {
             boolean success = partitionManager.restartPartition(partitionId);
 
-            Bukkit.getScheduler().runTask(plugin, () -> {
-                if (success) {
-                    sender.sendMessage(Component.text("✓ Partition restarted: " + partition.getName(),
-                            NamedTextColor.GREEN));
-                } else {
-                    sender.sendMessage(Component.text("✗ Failed to restart partition!",
-                            NamedTextColor.RED));
-                }
-            });
+            if (success) {
+                sender.sendMessage(Component.text("✓ Partition restarted: " + partition.getName(),
+                        NamedTextColor.GREEN));
+            } else {
+                sender.sendMessage(Component.text("✗ Failed to restart partition!",
+                        NamedTextColor.RED));
+            }
         });
     }
 

@@ -14,6 +14,9 @@ dependencies {
     // Core Plugin dependency
     compileOnly(project(":core-plugin"))
 
+    // Partition Plugin dependency (for partition-aware features)
+    compileOnly(project(":partition"))
+
     // API Module
     implementation(project(":api-module"))
 
@@ -71,7 +74,6 @@ tasks {
         relocate("org.spongepowered.configurate", "com.yourserver.lobby.libs.configurate")
 
         // DO NOT relocate Adventure API - Paper provides it!
-        // relocate("net.kyori", "com.yourserver.lobby.libs.kyori") // REMOVED
 
         // Exclude unnecessary files
         exclude("META-INF/*.SF")

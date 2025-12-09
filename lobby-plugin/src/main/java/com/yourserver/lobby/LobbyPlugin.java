@@ -6,13 +6,22 @@ import com.yourserver.lobby.command.SpawnCommand;
 import com.yourserver.lobby.config.LobbyConfig;
 import com.yourserver.lobby.cosmetics.CosmeticsManager;
 import com.yourserver.lobby.gui.GUIManager;
+import com.yourserver.lobby.items.ItemToggleManager;
 import com.yourserver.lobby.listener.CompassClickListener;
 import com.yourserver.lobby.listener.LobbyProtectionListener;
+import com.yourserver.lobby.listener.NetherStarClickListener;
+import com.yourserver.lobby.listener.NPCInteractListener;
 import com.yourserver.lobby.listener.PlayerConnectionListener;
+import com.yourserver.lobby.npc.NPCManager;
 import com.yourserver.lobby.scoreboard.ScoreboardManager;
 import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
+import com.yourserver.lobby.time.TimeManager;
+import com.yourserver.lobby.util.ItemBuilder;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
@@ -40,6 +49,9 @@ public class LobbyPlugin extends JavaPlugin {
     private TabListManager tabListManager;
     private GUIManager guiManager;
     private CosmeticsManager cosmeticsManager;
+    private ItemToggleManager itemToggleManager;
+    private NPCManager npcManager;
+    private TimeManager timeManager;
 
     @Override
     public void onLoad() {
@@ -72,6 +84,13 @@ public class LobbyPlugin extends JavaPlugin {
             tabListManager = new TabListManager(this, lobbyConfig);
             guiManager = new GUIManager(this, lobbyConfig, corePlugin);
             cosmeticsManager = new CosmeticsManager(this, lobbyConfig);
+            itemToggleManager = new ItemToggleManager();
+            npcManager = new NPCManager(this);
+            timeManager = new TimeManager(this, lobbyConfig);
+
+            // Set the item giver callback for when items are re-enabled
+            itemToggleManager.setItemGiver(this::giveJoinItems);
+
             getLogger().info("All managers initialized");
 
             // 5. Register listeners
@@ -88,18 +107,28 @@ public class LobbyPlugin extends JavaPlugin {
                     new CompassClickListener(guiManager),
                     this
             );
+            getServer().getPluginManager().registerEvents(
+                    new NetherStarClickListener(guiManager),
+                    this
+            );
+            getServer().getPluginManager().registerEvents(
+                    new NPCInteractListener(npcManager),
+                    this
+            );
             getServer().getPluginManager().registerEvents(guiManager, this);
             getLogger().info("Event listeners registered");
 
             // 6. Register commands
             getCommand("lobby").setExecutor(new LobbyCommand(this, spawnManager));
             getCommand("spawn").setExecutor(new SpawnCommand(this, spawnManager));
+            getCommand("npc").setExecutor(new com.yourserver.lobby.command.NPCCommand(this, npcManager));
             getLogger().info("Commands registered");
 
             // 7. Start update tasks
             scoreboardManager.startUpdateTask();
             tabListManager.startUpdateTask();
             cosmeticsManager.startTrailTask();
+            timeManager.startTimeTask();
             getLogger().info("Update tasks started");
 
             getLogger().info("LobbyPlugin enabled successfully!");
@@ -130,6 +159,21 @@ public class LobbyPlugin extends JavaPlugin {
             getLogger().info("Cosmetics manager shut down");
         }
 
+        if (itemToggleManager != null) {
+            itemToggleManager.shutdown();
+            getLogger().info("Item toggle manager shut down");
+        }
+
+        if (npcManager != null) {
+            npcManager.removeAllNPCs();
+            getLogger().info("NPC manager shut down");
+        }
+
+        if (timeManager != null) {
+            timeManager.shutdown();
+            getLogger().info("Time manager shut down");
+        }
+
         getLogger().info("LobbyPlugin disabled successfully!");
     }
 
@@ -152,6 +196,10 @@ public class LobbyPlugin extends JavaPlugin {
         cosmeticsManager.shutdown();
         cosmeticsManager = new CosmeticsManager(this, lobbyConfig);
         cosmeticsManager.startTrailTask();
+
+        timeManager.shutdown();
+        timeManager = new TimeManager(this, lobbyConfig);
+        timeManager.startTimeTask();
 
         getLogger().info("Configuration reloaded");
     }
@@ -188,5 +236,54 @@ public class LobbyPlugin extends JavaPlugin {
 
     public CosmeticsManager getCosmeticsManager() {
         return cosmeticsManager;
+    }
+
+    public ItemToggleManager getItemToggleManager() {
+        return itemToggleManager;
+    }
+
+    public NPCManager getNpcManager() {
+        return npcManager;
+    }
+
+    public TimeManager getTimeManager() {
+        return timeManager;
+    }
+
+    /**
+     * Gives join items to a player.
+     * Public method so it can be called by ItemToggleManager.
+     *
+     * @param player The player
+     */
+    public void giveJoinItems(Player player) {
+        var joinItemsConfig = lobbyConfig.getJoinItemsConfig();
+
+        if (!joinItemsConfig.isEnabled()) {
+            return;
+        }
+
+        // Clear inventory if configured
+        if (joinItemsConfig.isClearInventory()) {
+            player.getInventory().clear();
+        }
+
+        // Give configured items
+        for (var itemConfig : joinItemsConfig.getItems()) {
+            try {
+                Material material = Material.valueOf(itemConfig.getMaterial());
+
+                ItemStack item = new ItemBuilder(material)
+                        .name(miniMessage.deserialize(itemConfig.getName()))
+                        .lore(itemConfig.getLore().stream()
+                                .map(line -> miniMessage.deserialize(line))
+                                .toList())
+                        .build();
+
+                player.getInventory().setItem(itemConfig.getSlot(), item);
+            } catch (IllegalArgumentException e) {
+                getLogger().warning("Invalid material: " + itemConfig.getMaterial());
+            }
+        }
     }
 }

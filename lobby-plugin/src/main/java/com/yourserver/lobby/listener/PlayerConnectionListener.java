@@ -61,8 +61,10 @@ public class PlayerConnectionListener implements Listener {
         player.setFireTicks(0);
         player.setFallDistance(0);
 
-        // Give join items
-        giveJoinItems(player);
+        // Give join items (only if player has items enabled)
+        if (plugin.getItemToggleManager().hasItemsEnabled(player)) {
+            giveJoinItems(player);
+        }
 
         // Set up scoreboard
         if (plugin.getLobbyConfig().getScoreboardConfig().isEnabled()) {
@@ -87,6 +89,9 @@ public class PlayerConnectionListener implements Listener {
 
         // Remove cosmetics
         cosmeticsManager.removeTrail(player);
+
+        // Clean up item toggle state
+        plugin.getItemToggleManager().cleanup(player);
 
         // Custom quit message (optional)
         event.quitMessage(null); // Remove default quit message

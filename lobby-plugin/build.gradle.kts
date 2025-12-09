@@ -11,7 +11,7 @@ java {
 }
 
 dependencies {
-    // Core Plugin dependency - THIS IS WHAT'S MISSING!
+    // Core Plugin dependency
     compileOnly(project(":core-plugin"))
 
     // API Module
@@ -20,9 +20,10 @@ dependencies {
     // Paper API 1.21.4 (update to 1.21.8 when available)
     compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
 
-    // Adventure API (modern text components)
-    implementation("net.kyori:adventure-api:4.17.0")
-    implementation("net.kyori:adventure-text-minimessage:4.17.0")
+    // Adventure API - USE compileOnly, NOT implementation!
+    // Paper already includes Adventure API, so we don't need to shade it
+    compileOnly("net.kyori:adventure-api:4.17.0")
+    compileOnly("net.kyori:adventure-text-minimessage:4.17.0")
 
     // Configuration
     implementation("org.spongepowered:configurate-yaml:4.1.2")
@@ -66,9 +67,11 @@ tasks {
         archiveBaseName.set("LobbyPlugin")
         archiveClassifier.set("")
 
-        // Relocate dependencies to avoid conflicts
+        // Only relocate dependencies that are NOT already in Paper
         relocate("org.spongepowered.configurate", "com.yourserver.lobby.libs.configurate")
-        relocate("net.kyori", "com.yourserver.lobby.libs.kyori")
+
+        // DO NOT relocate Adventure API - Paper provides it!
+        // relocate("net.kyori", "com.yourserver.lobby.libs.kyori") // REMOVED
 
         // Exclude unnecessary files
         exclude("META-INF/*.SF")

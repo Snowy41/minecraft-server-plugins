@@ -2,22 +2,22 @@ package com.yourserver.lobby.listener;
 
 import com.yourserver.lobby.config.LobbyConfig;
 import org.bukkit.Location;
+import org.bukkit.entity.Entity;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.block.BlockBreakEvent;
 import org.bukkit.event.block.BlockPlaceEvent;
+import org.bukkit.event.entity.EntityDamageByEntityEvent;
 import org.bukkit.event.entity.EntityDamageEvent;
 import org.bukkit.event.entity.FoodLevelChangeEvent;
-import org.bukkit.event.player.PlayerDropItemEvent;
-import org.bukkit.event.player.PlayerInteractEvent;
-import org.bukkit.event.player.PlayerMoveEvent;
-import org.bukkit.event.player.PlayerPickupArrowEvent;
+import org.bukkit.event.player.*;
 import org.bukkit.event.weather.WeatherChangeEvent;
 
 /**
- * Handles lobby protection (prevent breaking blocks, damage, etc.)
+ * Handles lobby protection (prevent breaking blocks, damage, PvP, etc.)
+ * Cancels almost ALL interactions except plugin-specific items.
  */
 public class LobbyProtectionListener implements Listener {
 
@@ -102,6 +102,44 @@ public class LobbyProtectionListener implements Listener {
         }
     }
 
+    /**
+     * Prevent PvP (player attacking player).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityDamageByEntity(EntityDamageByEntityEvent event) {
+        // Check if victim is a player
+        if (!(event.getEntity() instanceof Player victim)) {
+            return;
+        }
+
+        if (shouldBypass(victim)) {
+            return;
+        }
+
+        if (!isInSpawnRegion(victim.getLocation())) {
+            return;
+        }
+
+        // Check if attacker is a player (direct or projectile)
+        Player attacker = null;
+
+        if (event.getDamager() instanceof Player) {
+            attacker = (Player) event.getDamager();
+        } else if (event.getDamager() instanceof org.bukkit.entity.Projectile projectile) {
+            if (projectile.getShooter() instanceof Player) {
+                attacker = (Player) projectile.getShooter();
+            }
+        }
+
+        // Cancel PvP if enabled in config
+        if (attacker != null && config.getProtectionConfig().isPvp()) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Prevent general damage to players.
+     */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDamage(EntityDamageEvent event) {
         if (!(event.getEntity() instanceof Player player)) {
@@ -118,15 +156,6 @@ public class LobbyProtectionListener implements Listener {
 
         // Check specific damage types
         EntityDamageEvent.DamageCause cause = event.getCause();
-
-        if (config.getProtectionConfig().isPlayerDamage()) {
-            if (cause == EntityDamageEvent.DamageCause.ENTITY_ATTACK ||
-                    cause == EntityDamageEvent.DamageCause.ENTITY_SWEEP_ATTACK ||
-                    cause == EntityDamageEvent.DamageCause.PROJECTILE) {
-                event.setCancelled(true);
-                return;
-            }
-        }
 
         if (config.getProtectionConfig().isFallDamage() && cause == EntityDamageEvent.DamageCause.FALL) {
             event.setCancelled(true);
@@ -147,6 +176,12 @@ public class LobbyProtectionListener implements Listener {
         }
 
         if (config.getProtectionConfig().isVoidDamage() && cause == EntityDamageEvent.DamageCause.VOID) {
+            event.setCancelled(true);
+            return;
+        }
+
+        // Block all other damage if player damage is enabled
+        if (config.getProtectionConfig().isPlayerDamage()) {
             event.setCancelled(true);
         }
     }
@@ -175,6 +210,23 @@ public class LobbyProtectionListener implements Listener {
         }
     }
 
+    /**
+     * Keep time always day if configured.
+     * Uses TimeSkipEvent (Paper-specific event when time naturally changes).
+     */
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onTimeSkip(org.bukkit.event.world.TimeSkipEvent event) {
+        if (!config.getProtectionConfig().isAlwaysDay()) {
+            return;
+        }
+
+        // Cancel natural time progression
+        event.setCancelled(true);
+
+        // Set to configured day time
+        event.getWorld().setTime(config.getProtectionConfig().getDayTime());
+    }
+
     @EventHandler(priority = EventPriority.MONITOR)
     public void onPlayerMove(PlayerMoveEvent event) {
         Player player = event.getPlayer();
@@ -192,6 +244,159 @@ public class LobbyProtectionListener implements Listener {
                         }
                 );
             }
+        }
+    }
+
+    /**
+     * Cancel ALL interactions with entities (armor stands, item frames, etc.)
+     * EXCEPT for custom NPCs (Citizens plugin) and our CustomNPCs.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerInteractEntity(PlayerInteractEntityEvent event) {
+        Player player = event.getPlayer();
+
+        if (shouldBypass(player)) {
+            return;
+        }
+
+        if (!isInSpawnRegion(player.getLocation())) {
+            return;
+        }
+
+        Entity entity = event.getRightClicked();
+
+        // Allow interaction with Citizens NPCs (if Citizens is installed)
+        if (entity.hasMetadata("NPC")) {
+            return; // Allow NPC interactions
+        }
+
+        // Allow interaction with our custom NPCs
+        if (entity.hasMetadata("CustomNPC")) {
+            return; // Allow custom NPC interactions
+        }
+
+        // Cancel all other entity interactions
+        event.setCancelled(true);
+    }
+
+    /**
+     * Cancel interactions at specific entities (armor stands in spawn, etc.)
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerInteractAtEntity(PlayerInteractAtEntityEvent event) {
+        Player player = event.getPlayer();
+
+        if (shouldBypass(player)) {
+            return;
+        }
+
+        if (!isInSpawnRegion(player.getLocation())) {
+            return;
+        }
+
+        Entity entity = event.getRightClicked();
+
+        // Allow interaction with Citizens NPCs
+        if (entity.hasMetadata("NPC")) {
+            return;
+        }
+
+        // Allow interaction with our custom NPCs
+        if (entity.hasMetadata("CustomNPC")) {
+            return;
+        }
+
+        // Cancel all other entity interactions
+        event.setCancelled(true);
+    }
+
+    /**
+     * Prevent attacking entities (armor stands, item frames, etc.)
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onEntityDamageByPlayer(EntityDamageByEntityEvent event) {
+        // Get the attacker
+        Entity damager = event.getDamager();
+        Player attacker = null;
+
+        if (damager instanceof Player) {
+            attacker = (Player) damager;
+        } else if (damager instanceof org.bukkit.entity.Projectile projectile) {
+            if (projectile.getShooter() instanceof Player) {
+                attacker = (Player) projectile.getShooter();
+            }
+        }
+
+        if (attacker == null) {
+            return;
+        }
+
+        if (shouldBypass(attacker)) {
+            return;
+        }
+
+        if (!isInSpawnRegion(attacker.getLocation())) {
+            return;
+        }
+
+        Entity victim = event.getEntity();
+
+        // Allow damaging Citizens NPCs (if you want combat NPCs later)
+        if (victim.hasMetadata("NPC")) {
+            return;
+        }
+
+        // If victim is not a player, cancel the damage (armor stands, item frames, etc.)
+        if (!(victim instanceof Player)) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Prevent bucket usage (water/lava placement).
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerBucketEmpty(PlayerBucketEmptyEvent event) {
+        Player player = event.getPlayer();
+
+        if (shouldBypass(player)) {
+            return;
+        }
+
+        if (isInSpawnRegion(player.getLocation())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Prevent bucket filling.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerBucketFill(PlayerBucketFillEvent event) {
+        Player player = event.getPlayer();
+
+        if (shouldBypass(player)) {
+            return;
+        }
+
+        if (isInSpawnRegion(player.getLocation())) {
+            event.setCancelled(true);
+        }
+    }
+
+    /**
+     * Cancel bed interactions.
+     */
+    @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
+    public void onPlayerBedEnter(PlayerBedEnterEvent event) {
+        Player player = event.getPlayer();
+
+        if (shouldBypass(player)) {
+            return;
+        }
+
+        if (isInSpawnRegion(player.getLocation())) {
+            event.setCancelled(true);
         }
     }
 }

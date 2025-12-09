@@ -112,6 +112,8 @@ public class LobbyConfig {
                 node.node("pvp").getBoolean(true),
                 node.node("hunger").getBoolean(true),
                 node.node("weather-clear").getBoolean(true),
+                node.node("always-day").getBoolean(true),        // ADD THIS
+                node.node("day-time").getLong(6000),
                 node.node("void-teleport").getBoolean(true),
                 node.node("void-y-level").getInt(-64),
                 spawnRegion
@@ -242,6 +244,8 @@ public class LobbyConfig {
         private final boolean pvp;
         private final boolean hunger;
         private final boolean weatherClear;
+        private final boolean alwaysDay;        // ADD THIS FIELD
+        private final long dayTime;             // ADD THIS FIELD
         private final boolean voidTeleport;
         private final int voidYLevel;
         private final Region spawnRegion;
@@ -249,8 +253,8 @@ public class LobbyConfig {
         public ProtectionConfig(boolean opBypass, boolean blockBreak, boolean blockPlace,
                                 boolean itemDrop, boolean itemPickup, boolean playerDamage, boolean fallDamage,
                                 boolean fireDamage, boolean drowningDamage, boolean voidDamage, boolean pvp,
-                                boolean hunger, boolean weatherClear, boolean voidTeleport, int voidYLevel,
-                                Region spawnRegion) {
+                                boolean hunger, boolean weatherClear, boolean alwaysDay, long dayTime,  // ADD THESE PARAMS
+                                boolean voidTeleport, int voidYLevel, Region spawnRegion) {
             this.opBypass = opBypass;
             this.blockBreak = blockBreak;
             this.blockPlace = blockPlace;
@@ -264,6 +268,8 @@ public class LobbyConfig {
             this.pvp = pvp;
             this.hunger = hunger;
             this.weatherClear = weatherClear;
+            this.alwaysDay = alwaysDay;         // ADD THIS ASSIGNMENT
+            this.dayTime = dayTime;             // ADD THIS ASSIGNMENT
             this.voidTeleport = voidTeleport;
             this.voidYLevel = voidYLevel;
             this.spawnRegion = spawnRegion;
@@ -282,6 +288,8 @@ public class LobbyConfig {
         public boolean isPvp() { return pvp; }
         public boolean isHunger() { return hunger; }
         public boolean isWeatherClear() { return weatherClear; }
+        public boolean isAlwaysDay() { return alwaysDay; }       // ADD THIS GETTER
+        public long getDayTime() { return dayTime; }             // ADD THIS GETTER
         public boolean isVoidTeleport() { return voidTeleport; }
         public int getVoidYLevel() { return voidYLevel; }
         public Region getSpawnRegion() { return spawnRegion; }

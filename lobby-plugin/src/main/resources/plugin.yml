@@ -3,7 +3,7 @@ version: '${version}'
 main: com.yourserver.lobby.LobbyPlugin
 api-version: '1.21'
 author: MCBZH
-description: Lobby system with scoreboards, tab list, GUIs, and cosmetics
+description: Lobby system with scoreboards, tab list, GUIs, cosmetics, and custom NPCs
 
 # Depends on CorePlugin for database and Redis
 depend:
@@ -20,7 +20,7 @@ load: POSTWORLD
 commands:
   lobby:
     description: Main lobby command
-    usage: /<command> [reload|setspawn]
+    usage: /<command> [reload|setspawn|item]
     permission: lobby.admin
     aliases: [hub, l]
 
@@ -29,6 +29,11 @@ commands:
     usage: /<command>
     permission: lobby.spawn
     aliases: [s]
+
+  npc:
+    description: Manage custom NPCs
+    usage: /<command> <create|remove|list|action|hologram|teleporthere>
+    permission: lobby.npc
 
 permissions:
   lobby.admin:
@@ -46,3 +51,7 @@ permissions:
   lobby.cosmetics.vip:
     description: Access to VIP cosmetics
     default: false
+
+  lobby.npc:
+    description: Manage custom NPCs
+    default: op

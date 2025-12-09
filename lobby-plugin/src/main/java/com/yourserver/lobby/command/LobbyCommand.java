@@ -12,12 +12,13 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 
 /**
  * Main lobby command for admin operations.
- * /lobby [reload|setspawn]
+ * /lobby [reload|setspawn|item]
  */
 public class LobbyCommand implements CommandExecutor, TabCompleter {
 
@@ -71,6 +72,7 @@ public class LobbyCommand implements CommandExecutor, TabCompleter {
         switch (subCommand) {
             case "reload" -> handleReload(sender);
             case "setspawn" -> handleSetSpawn(sender);
+            case "item" -> handleItem(sender, args);
             default -> sendHelp(sender);
         }
 
@@ -119,12 +121,56 @@ public class LobbyCommand implements CommandExecutor, TabCompleter {
         ));
     }
 
+    private void handleItem(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("lobby.admin")) {
+            sender.sendMessage(Component.text(
+                    plugin.getLobbyConfig().getMessagesConfig().getNoPermission(),
+                    NamedTextColor.RED
+            ));
+            return;
+        }
+
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can use this command!", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 2) {
+            player.sendMessage(Component.text("Usage: /lobby item <toggle>", NamedTextColor.RED));
+            return;
+        }
+
+        String action = args[1].toLowerCase();
+
+        if (action.equals("toggle")) {
+            boolean currentState = plugin.getItemToggleManager().hasItemsEnabled(player);
+            plugin.getItemToggleManager().toggleItems(player);
+
+            if (currentState) {
+                // Was enabled, now disabled
+                player.sendMessage(plugin.getMiniMessage().deserialize(
+                        plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
+                                "<red>Lobby items disabled! (Builder mode)"
+                ));
+            } else {
+                // Was disabled, now enabled
+                player.sendMessage(plugin.getMiniMessage().deserialize(
+                        plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
+                                "<green>Lobby items enabled!"
+                ));
+            }
+        } else {
+            player.sendMessage(Component.text("Usage: /lobby item <toggle>", NamedTextColor.RED));
+        }
+    }
+
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== Lobby Commands ===", NamedTextColor.GOLD));
         sender.sendMessage(Component.text("/lobby - Teleport to spawn", NamedTextColor.GRAY));
 
         if (sender.hasPermission("lobby.admin")) {
             sender.sendMessage(Component.text("/lobby setspawn - Set spawn location", NamedTextColor.GRAY));
+            sender.sendMessage(Component.text("/lobby item toggle - Toggle lobby items (builder mode)", NamedTextColor.GRAY));
             sender.sendMessage(Component.text("/lobby reload - Reload configuration", NamedTextColor.GRAY));
         }
     }
@@ -138,8 +184,13 @@ public class LobbyCommand implements CommandExecutor, TabCompleter {
             @NotNull String[] args
     ) {
         if (args.length == 1 && sender.hasPermission("lobby.admin")) {
-            return Arrays.asList("reload", "setspawn");
+            return Arrays.asList("reload", "setspawn", "item");
         }
+
+        if (args.length == 2 && args[0].equalsIgnoreCase("item") && sender.hasPermission("lobby.admin")) {
+            return List.of("toggle");
+        }
+
         return List.of();
     }
 }

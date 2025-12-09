@@ -12,7 +12,7 @@ spawn:
 
 # Lobby protection settings
 protection:
-  # Allow OPs to bypass all protection
+  # Allow OPs to bypass all protection (useful for builders)
   op-bypass: true
 
   # Prevent block breaking/placing
@@ -23,27 +23,33 @@ protection:
   item-drop: true
   item-pickup: true
 
-  # Prevent damage
+  # Prevent ALL damage to players
   player-damage: true
   fall-damage: true
   fire-damage: true
   drowning-damage: true
   void-damage: false  # Don't prevent void damage (teleport to spawn instead)
 
-  # Prevent combat
+  # Prevent PvP (player vs player combat)
+  # This includes direct attacks and projectiles
   pvp: true
 
-  # Prevent hunger
+  # Prevent hunger loss
   hunger: true
 
-  # Prevent weather changes
+  # Keep weather always clear
   weather-clear: true
+
+  # Always keep it day
+  always-day: true
+  day-time: 6000  # Time to set (0-24000, 6000 = noon, 0 = sunrise, 18000 = midnight)
 
   # Teleport to spawn on void fall
   void-teleport: true
   void-y-level: -64
 
   # Protected regions (your spawn area)
+  # All protections only apply within this region
   regions:
     spawn:
       enabled: true

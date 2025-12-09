@@ -79,7 +79,9 @@ scoreboard:
     - "<gray>Player: <white>{player}"
     - "<gray>Rank: {rank}"
     - ""
-    - "<gray>Online: <green>{online}<gray>/<green>{max_players}"
+    - "<yellow>Partition: {partition}"        # NEW! Shows partition name
+    - "<gray>Online: <green>{online}"         # Now partition-specific!
+    - "<gray>Max: <green>{max_players}"       # Now partition-specific!
     - ""
     - "<yellow>play.yourserver.com"
     - ""

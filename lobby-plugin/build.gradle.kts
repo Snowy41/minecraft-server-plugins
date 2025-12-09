@@ -14,9 +14,6 @@ dependencies {
     // Core Plugin dependency
     compileOnly(project(":core-plugin"))
 
-    // Partition Plugin dependency (for partition-aware features)
-    compileOnly(project(":partition"))
-
     // API Module
     implementation(project(":api-module"))
 

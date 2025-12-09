@@ -1,6 +1,7 @@
 package com.yourserver.partition.command;
 
 import com.yourserver.partition.PartitionPlugin;
+import com.yourserver.partition.isolation.PartitionIsolationSystem;
 import com.yourserver.partition.manager.PartitionManager;
 import com.yourserver.partition.model.Partition;
 import net.kyori.adventure.text.Component;
@@ -28,10 +29,14 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
 
     private final PartitionPlugin plugin;
     private final PartitionManager partitionManager;
+    private final PartitionIsolationSystem isolationSystem; // ADD THIS FIELD
 
-    public PartitionCommand(PartitionPlugin plugin, PartitionManager partitionManager) {
+    public PartitionCommand(PartitionPlugin plugin,
+                            PartitionManager partitionManager,
+                            PartitionIsolationSystem isolationSystem) {
         this.plugin = plugin;
         this.partitionManager = partitionManager;
+        this.isolationSystem = isolationSystem; // ADD THIS
     }
 
     @Override
@@ -52,13 +57,11 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
             case "list" -> handleList(sender);
             case "info" -> handleInfo(sender, args);
             case "tp", "teleport" -> handleTeleport(sender, args);
-            case "restart" -> handleRestart(sender, args);
+            case "restart" -> handleRestartWithHotReload(sender, args);  // UPDATED!
+            case "return" -> handleReturn(sender);                        // NEW!
             case "reload" -> handleReload(sender);
             case "worlds" -> handleWorlds(sender);
             case "plugins" -> handlePlugins(sender, args);
-            case "add" -> handleAdd(sender, args);
-            case "enable" -> handleEnable(sender, args);
-            case "disable" -> handleDisable(sender, args);
             default -> sendHelp(sender);
         }
 
@@ -100,6 +103,56 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
                     .append(Component.text(String.valueOf(playerCount), NamedTextColor.WHITE)));
             sender.sendMessage(Component.empty());
         }
+    }
+
+    private void handleRestartWithHotReload(CommandSender sender, String[] args) {
+        if (!sender.hasPermission("partition.restart")) {
+            sender.sendMessage(Component.text("No permission!", NamedTextColor.RED));
+            return;
+        }
+
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can restart partitions!",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /partition restart <partition>",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        String partitionId = args[1];
+        Partition partition = partitionManager.getPartition(partitionId);
+
+        if (partition == null) {
+            sender.sendMessage(Component.text("Partition not found: " + partitionId,
+                    NamedTextColor.RED));
+            return;
+        }
+
+        // Use the new hot-loader
+        sender.sendMessage(Component.text("🔄 Restarting partition: " + partition.getName() + "...",
+                NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("  • Moving players to lobby...", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  • Hot-reloading plugins...", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("  • This may take a moment...", NamedTextColor.GRAY));
+
+        pluginHotLoader.restartPartitionWithPluginReload(partitionId, player);
+    }
+
+    /**
+     * NEW: Handles player returning after partition restart.
+     */
+    private void handleReturn(CommandSender sender) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can return to partitions!",
+                    NamedTextColor.RED));
+            return;
+        }
+
+        pluginHotLoader.handlePlayerReturn(player);
     }
 
     private void handleInfo(CommandSender sender, String[] args) {
@@ -217,19 +270,49 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        sender.sendMessage(Component.text("Restarting partition: " + partition.getName() + "...",
+        sender.sendMessage(Component.text("🔄 Restarting partition: " + partition.getName() + "...",
                 NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("  1. Saving player states...", NamedTextColor.GRAY));
 
         // MUST restart synchronously on main thread!
         Bukkit.getScheduler().runTask(plugin, () -> {
-            boolean success = partitionManager.restartPartition(partitionId);
+            try {
+                // Step 1: Prepare for restart (save states)
+                isolationSystem.preparePartitionRestart(partitionId);
+                sender.sendMessage(Component.text("  ✓ Player states saved", NamedTextColor.GREEN));
 
-            if (success) {
-                sender.sendMessage(Component.text("✓ Partition restarted: " + partition.getName(),
-                        NamedTextColor.GREEN));
-            } else {
-                sender.sendMessage(Component.text("✗ Failed to restart partition!",
+                // Step 2: Actually restart the partition
+                sender.sendMessage(Component.text("  2. Restarting partition...", NamedTextColor.GRAY));
+                boolean success = partitionManager.restartPartition(partitionId);
+
+                if (success) {
+                    // Step 3: Restore after restart
+                    sender.sendMessage(Component.text("  3. Restoring player states...", NamedTextColor.GRAY));
+
+                    // Small delay to ensure partition is fully loaded
+                    Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                        isolationSystem.restorePartitionAfterRestart(partitionId);
+
+                        sender.sendMessage(Component.empty());
+                        sender.sendMessage(Component.text("✓ Partition restarted successfully!",
+                                NamedTextColor.GREEN, TextDecoration.BOLD));
+                        sender.sendMessage(Component.text("  Partition: " + partition.getName(),
+                                NamedTextColor.GRAY));
+                        sender.sendMessage(Component.text("  Players restored: " +
+                                        partitionManager.getPlayersInPartition(partitionId).size(),
+                                NamedTextColor.GRAY));
+                    }, 40L); // 2 second delay for restoration
+
+                } else {
+                    sender.sendMessage(Component.text("✗ Failed to restart partition!",
+                            NamedTextColor.RED));
+                }
+
+            } catch (Exception e) {
+                sender.sendMessage(Component.text("✗ Error during restart: " + e.getMessage(),
                         NamedTextColor.RED));
+                plugin.getLogger().severe("Partition restart error: " + e.getMessage());
+                e.printStackTrace();
             }
         });
     }

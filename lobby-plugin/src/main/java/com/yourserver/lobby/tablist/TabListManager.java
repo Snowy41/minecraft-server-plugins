@@ -6,6 +6,7 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
+import com.yourserver.lobby.util.PartitionHelper;
 
 /**
  * Manages player tab list headers and footers.
@@ -76,10 +77,11 @@ public class TabListManager {
      * @return The text with placeholders replaced
      */
     private String parsePlaceholders(String text, Player player) {
+        // NEW WAY (partition-aware):
+        text = PartitionHelper.replacePlaceholders(text, player);
+
         return text
-                .replace("{player}", player.getName())
-                .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
-                .replace("{max_players}", String.valueOf(Bukkit.getMaxPlayers()));
+                .replace("{player}", player.getName());
     }
 
     /**

@@ -178,6 +178,33 @@ public class LobbyPlugin extends JavaPlugin {
     }
 
     /**
+     * Called by PartitionPlugin when a player changes partitions.
+     * This method is invoked via reflection - NO IMPORTS NEEDED!
+     */
+    public void onPlayerPartitionChange(Player player, String oldPartition, String newPartition) {
+        getLogger().info("Player " + player.getName() +
+                " changed partitions: " + oldPartition + " → " + newPartition);
+
+        // Update scoreboard immediately
+        if (scoreboardManager != null) {
+            scoreboardManager.updateScoreboard(player);
+        }
+
+        // Update tab list immediately
+        if (tabListManager != null) {
+            tabListManager.updatePlayer(player);
+        }
+
+        // Optional: Send message to player
+        if (newPartition != null) {
+            player.sendMessage(miniMessage.deserialize(
+                    "<gray>You entered a new partition"
+            ));
+        }
+    }
+
+
+    /**
      * Reloads the plugin configuration.
      */
     public void reloadConfiguration() {

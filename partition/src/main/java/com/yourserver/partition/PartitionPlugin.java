@@ -2,6 +2,8 @@ package com.yourserver.partition;
 
 import com.yourserver.partition.command.PartitionCommand;
 import com.yourserver.partition.config.PartitionConfig;
+import com.yourserver.partition.isolation.PartitionIsolationSystem;
+import com.yourserver.partition.listener.PartitionAwarePluginListener;
 import com.yourserver.partition.listener.PartitionIsolationListener;
 import com.yourserver.partition.listener.PlayerWorldChangeListener;
 import com.yourserver.partition.listener.PluginIsolationListener;
@@ -9,13 +11,21 @@ import com.yourserver.partition.manager.PartitionManager;
 import com.yourserver.partition.manager.PluginIsolationManager;
 import com.yourserver.partition.manager.WorldManager;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
 
 /**
- * Main partition plugin class.
- * Provides multi-server partition system for isolated mini-servers.
+ * ENHANCED PartitionPlugin - Complete mini-server isolation.
+ *
+ * Each partition behaves like a completely separate server:
+ * - Isolated player visibility (tab list)
+ * - Isolated chat
+ * - Isolated worlds
+ * - Isolated plugins
+ * - Persistent state across restarts
+ * - Dynamic updates
  */
 public class PartitionPlugin extends JavaPlugin {
 
@@ -24,6 +34,7 @@ public class PartitionPlugin extends JavaPlugin {
     private WorldManager worldManager;
     private PartitionManager partitionManager;
     private PluginIsolationManager pluginIsolationManager;
+    private PartitionIsolationSystem isolationSystem; // NEW!
 
     @Override
     public void onLoad() {
@@ -47,12 +58,18 @@ public class PartitionPlugin extends JavaPlugin {
             worldManager = new WorldManager(this);
             pluginIsolationManager = new PluginIsolationManager(this);
             partitionManager = new PartitionManager(this, config, worldManager);
-            getLogger().info("Managers initialized");
 
-            // 4. Load all partitions
+            // 4. Initialize NEW isolation system
+            isolationSystem = new PartitionIsolationSystem(this, partitionManager);
+            getLogger().info("Isolation system initialized");
+
+            // 5. Load all partitions
             partitionManager.loadAllPartitions();
 
-            // 5. Register listeners
+            // 6. Register listeners (NEW ORDER - isolation system first!)
+            getServer().getPluginManager().registerEvents(isolationSystem, this);
+            getLogger().info("Isolation system listener registered");
+
             getServer().getPluginManager().registerEvents(
                     new PlayerWorldChangeListener(partitionManager),
                     this
@@ -65,18 +82,33 @@ public class PartitionPlugin extends JavaPlugin {
                     new PartitionIsolationListener(this, partitionManager),
                     this
             );
+
+            // NEW: Register partition-aware plugin listener
+            getServer().getPluginManager().registerEvents(
+                    new PartitionAwarePluginListener(this, partitionManager, isolationSystem),
+                    this
+            );
             getLogger().info("Event listeners registered");
 
-            // 6. Register commands
-            PartitionCommand partitionCommand = new PartitionCommand(this, partitionManager);
+            // 7. Register commands
+            PartitionCommand partitionCommand = new PartitionCommand(this, partitionManager, isolationSystem);
             getCommand("partition").setExecutor(partitionCommand);
             getCommand("partition").setTabCompleter(partitionCommand);
             getLogger().info("Commands registered");
 
-            // 7. Log isolation settings
+            // 8. Log isolation settings
             logIsolationSettings();
 
+            // 9. Schedule periodic visibility check (every 30 seconds)
+            Bukkit.getScheduler().runTaskTimer(this, () -> {
+                for (var partition : partitionManager.getAllPartitions()) {
+                    isolationSystem.updatePartitionVisibility(partition.getId());
+                }
+            }, 600L, 600L); // 30 seconds
+
             getLogger().info("PartitionPlugin enabled successfully!");
+            getLogger().info("✓ Complete partition isolation active");
+            getLogger().info("✓ Each partition is now a separate mini-server");
 
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "Failed to enable PartitionPlugin!", e);
@@ -87,6 +119,11 @@ public class PartitionPlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         getLogger().info("Disabling PartitionPlugin...");
+
+        if (isolationSystem != null) {
+            isolationSystem.shutdown();
+            getLogger().info("Isolation system shut down");
+        }
 
         if (partitionManager != null) {
             partitionManager.shutdown();
@@ -112,9 +149,13 @@ public class PartitionPlugin extends JavaPlugin {
         if (partitionManager != null) {
             partitionManager.shutdown();
         }
+        if (isolationSystem != null) {
+            isolationSystem.shutdown();
+        }
 
         worldManager = new WorldManager(this);
         partitionManager = new PartitionManager(this, config, worldManager);
+        isolationSystem = new PartitionIsolationSystem(this, partitionManager);
         partitionManager.loadAllPartitions();
 
         getLogger().info("Configuration reloaded");
@@ -132,6 +173,8 @@ public class PartitionPlugin extends JavaPlugin {
         getLogger().info("  Tab List Isolation: " + (settings.isTablistIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
         getLogger().info("  Command Isolation: " + (settings.isCommandIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
         getLogger().info("  World Border Isolation: " + (settings.isWorldBorderIsolation() ? "✓ ENABLED" : "✗ DISABLED"));
+        getLogger().info("  Persistent State: ✓ ENABLED (across restarts)");
+        getLogger().info("  Dynamic Updates: ✓ ENABLED (real-time)");
         getLogger().info("====================================");
     }
 
@@ -155,5 +198,12 @@ public class PartitionPlugin extends JavaPlugin {
 
     public PluginIsolationManager getPluginIsolationManager() {
         return pluginIsolationManager;
+    }
+
+    /**
+     * NEW: Gets the isolation system for advanced partition features.
+     */
+    public PartitionIsolationSystem getIsolationSystem() {
+        return isolationSystem;
     }
 }

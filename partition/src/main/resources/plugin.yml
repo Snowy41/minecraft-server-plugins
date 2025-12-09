@@ -1,0 +1,81 @@
+name: PartitionPlugin
+version: '${version}'
+main: com.yourserver.partition.PartitionPlugin
+api-version: '1.21'
+author: MCBZH
+description: Multi-server partition system for isolated mini-servers
+
+# Depends on CorePlugin
+depend:
+  - CorePlugin
+
+# Load order - load after other plugins so we can manage them
+load: POSTWORLD
+
+commands:
+  partition:
+    description: Manage server partitions
+    usage: |
+      /<command> list - List all partitions
+      /<command> info <partition> - Show partition details
+      /<command> tp <partition> - Teleport to partition
+      /<command> restart <partition> - Restart partition
+      /<command> reload - Reload configuration
+      /<command> worlds - List world mappings
+      /<command> plugins <partition> - List partition plugins
+      /<command> add world [worldname] <partition> - Add world to partition
+      /<command> enable plugin <plugin> <partition> - Enable plugin
+      /<command> disable plugin <plugin> <partition> - Disable plugin
+    permission: partition.admin
+    aliases: [part, partitions]
+
+permissions:
+  partition.admin:
+    description: Full access to partition management
+    default: op
+    children:
+      partition.list: true
+      partition.info: true
+      partition.teleport: true
+      partition.restart: true
+      partition.reload: true
+      partition.worlds: true
+      partition.plugins: true
+      partition.add: true
+      partition.plugins.manage: true
+
+  partition.list:
+    description: List all partitions
+    default: op
+
+  partition.info:
+    description: View partition information
+    default: op
+
+  partition.teleport:
+    description: Teleport to partitions
+    default: op
+
+  partition.restart:
+    description: Restart partitions
+    default: op
+
+  partition.reload:
+    description: Reload partition configuration
+    default: op
+
+  partition.worlds:
+    description: View world mappings
+    default: op
+
+  partition.plugins:
+    description: View partition plugins
+    default: op
+
+  partition.add:
+    description: Add worlds to partitions
+    default: op
+
+  partition.plugins.manage:
+    description: Enable/disable plugins for partitions
+    default: op

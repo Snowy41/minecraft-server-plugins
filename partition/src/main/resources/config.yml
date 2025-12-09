@@ -1,0 +1,230 @@
+# Partition Plugin Configuration
+# Version: 1.0.0
+#
+# This plugin splits your server into multiple isolated "mini-servers"
+# Each partition can have its own worlds and plugins, running independently.
+#
+# Use Cases:
+# - Build Server: Safe building environment without affecting production
+# - Dev Server: Testing new features and plugins
+# - Production Server: Main gameplay server
+# - Mini-Games: Isolated game instances
+
+# ===== ISOLATION SETTINGS =====
+# Controls how players in different partitions interact
+isolation:
+  # Should players only see chat from their partition?
+  chat: true
+
+  # Should tab list only show players in the same partition?
+  tablist: true
+
+  # Should commands be partition-specific? (Experimental)
+  commands: false
+
+  # Should world borders be enforced per-partition?
+  world-border: true
+
+# ===== PARTITIONS =====
+# Define your server partitions here
+# Each partition is an isolated mini-server
+
+partitions:
+  # ===== BUILD SERVER =====
+  # Safe environment for building and testing
+  build:
+    name: "Build Server"
+    description: "Creative building environment for the team"
+    enabled: true
+
+    # Worlds assigned to this partition
+    worlds:
+      - "world"          # Your current build world (Minecraft overworld)
+      - "world_nether"   # Nether for build server
+      - "world_the_end"  # End for build server
+
+    # Plugins active in this partition
+    # Only these plugins will be active when players are in this partition
+    plugins:
+      - "CorePlugin"
+      - "WorldEdit"
+      - "FastAsyncWorldEdit"
+      - "ViaVersion"
+      - "ViaBackwards"
+
+    # Spawn location for this partition
+    spawn-world: "world"
+    spawn-location:
+      x: 0.5
+      y: 64.0
+      z: 0.5
+      yaw: 0.0
+      pitch: 0.0
+
+    # Auto-load on server start?
+    auto-load: true
+
+    # Persist data when partition restarts?
+    persistent: true
+
+  # ===== DEV SERVER =====
+  # Testing environment for new features
+  dev:
+    name: "Development Server"
+    description: "Testing new plugins and features"
+    enabled: true
+
+    worlds:
+      - "dev_world"
+      - "dev_world_nether"
+      - "dev_world_the_end"
+
+    plugins:
+      - "CorePlugin"
+      - "LobbyPlugin"
+      - "PartitionPlugin"  # This plugin itself
+      - "WorldEdit"
+      - "ViaVersion"
+      - "ViaBackwards"
+
+    spawn-world: "dev_world"
+    spawn-location:
+      x: 0.5
+      y: 64.0
+      z: 0.5
+      yaw: 0.0
+      pitch: 0.0
+
+    auto-load: true
+    persistent: true
+
+  # ===== PRODUCTION SERVER =====
+  # Main gameplay server
+  prod:
+    name: "Production Server"
+    description: "Main gameplay server for players"
+    enabled: true
+
+    worlds:
+      - "lobby_world"
+      - "game_world"
+      - "game_world_nether"
+      - "game_world_the_end"
+
+    # All gameplay plugins
+    plugins:
+      - "CorePlugin"
+      - "LobbyPlugin"
+      - "PartitionPlugin"
+      - "ViaVersion"
+      - "ViaBackwards"
+      # Add your gameplay plugins here
+      # - "BattleRoyalePlugin"
+      # - "MinigamePlugin"
+
+    spawn-world: "lobby_world"
+    spawn-location:
+      x: 0.5
+      y: 64.0
+      z: 0.5
+      yaw: 0.0
+      pitch: 0.0
+
+    auto-load: true
+    persistent: true
+
+  # ===== EXAMPLE: MINI-GAME PARTITION =====
+  # You can create partitions for specific mini-games
+  # minigame1:
+  #   name: "SkyWars Arena"
+  #   description: "SkyWars mini-game server"
+  #   enabled: false
+  #
+  #   worlds:
+  #     - "skywars_world"
+  #
+  #   plugins:
+  #     - "CorePlugin"
+  #     - "SkyWarsPlugin"
+  #
+  #   spawn-world: "skywars_world"
+  #   spawn-location:
+  #     x: 0.5
+  #     y: 100.0
+  #     z: 0.5
+  #     yaw: 0.0
+  #     pitch: 0.0
+  #
+  #   auto-load: false
+  #   persistent: false  # Don't persist, reset on restart
+
+# ===== NOTES =====
+#
+# 1. ADDING WORLDS TO PARTITIONS
+#    To add your current world to a partition:
+#    - Use: /partition add world <partition-id>
+#    - Example: /partition add world build
+#    - This adds your current world to the partition
+#
+# 2. PLUGIN ISOLATION
+#    - Plugins listed in a partition's "plugins" list will be considered active
+#    - Players in that partition will only interact with those plugins
+#    - Other plugins will be "invisible" to players in that partition
+#
+# 3. RESTARTING PARTITIONS
+#    - Use: /partition restart <partition-id>
+#    - Example: /partition restart dev
+#    - This reloads plugins for that partition without affecting others
+#    - Players will be temporarily moved out and back in
+#
+# 4. WORLD MANAGEMENT
+#    - Worlds can only belong to ONE partition
+#    - Make sure world names match exactly (case-sensitive)
+#    - World must be loaded by Bukkit before assignment
+#
+# 5. PERFORMANCE CONSIDERATIONS
+#    - Each partition adds some overhead
+#    - Recommended maximum: 5-10 partitions per server
+#    - Monitor RAM and CPU usage when running multiple partitions
+#
+# 6. PLUGIN LOADING
+#    - CorePlugin should be in ALL partitions (required)
+#    - Partition-specific plugins isolate functionality
+#    - Hot-reloading plugins is experimental - use with caution!
+#
+# 7. SPAWN LOCATIONS
+#    - Set accurate spawn locations for each partition
+#    - Players teleporting to a partition will spawn here
+#    - Use /partition tp <partition-id> to test
+
+# ===== USEFUL COMMANDS =====
+#
+# View all partitions:
+#   /partition list
+#
+# View partition details:
+#   /partition info build
+#
+# Teleport to partition:
+#   /partition tp build
+#
+# View world mappings:
+#   /partition worlds
+#
+# View partition plugins:
+#   /partition plugins build
+#
+# Restart a partition:
+#   /partition restart dev
+#
+# Reload configuration:
+#   /partition reload
+#
+# Add current world to partition:
+#   /partition add world build
+#
+# Enable plugin for partition:
+#   /partition enable plugin WorldEdit build
+#
+# Disable plugin for partition:
+#   /partition disable plugin SomePlugin dev

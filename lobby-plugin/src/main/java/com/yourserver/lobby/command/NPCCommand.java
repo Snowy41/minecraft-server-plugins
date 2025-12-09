@@ -16,16 +16,16 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.stream.Collectors;
 
 /**
  * Command for managing custom NPCs.
- * /npc create <id> <name> [skin_texture] [skin_signature]
+ * /npc create <id> <name> - Creates NPC with player's skin
  * /npc remove <id>
  * /npc list
  * /npc action <id> <type> <data>
  * /npc hologram <id> add <line>
  * /npc hologram <id> clear
+ * /npc teleporthere <id>
  */
 public class NPCCommand implements CommandExecutor, TabCompleter {
 
@@ -77,16 +77,22 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         if (args.length < 3) {
             sender.sendMessage(Component.text(
-                    "Usage: /npc create <id> <name> [skin_texture] [skin_signature]",
+                    "Usage: /npc create <id> <username>",
                     NamedTextColor.RED
+            ));
+            sender.sendMessage(Component.text(
+                    "Example: /npc create game_selector Steve",
+                    NamedTextColor.GRAY
+            ));
+            sender.sendMessage(Component.text(
+                    "The NPC will use the skin of 'Steve' (real player username)",
+                    NamedTextColor.GRAY
             ));
             return;
         }
 
         String id = args[1];
-        String name = args[2];
-        String skinTexture = args.length > 3 ? args[3] : null;
-        String skinSignature = args.length > 4 ? args[4] : null;
+        String username = args[2];
 
         // Check if NPC already exists
         if (npcManager.getNPC(id) != null) {
@@ -97,22 +103,35 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         // Create NPC at player's location
         CustomNPC npc = new CustomNPC(
                 id,
-                name,
+                username,
                 player.getLocation(),
-                skinTexture,
-                skinSignature,
+                null, // Skin will be fetched automatically
+                null,
                 new CustomNPC.NPCAction(CustomNPC.NPCAction.ActionType.MESSAGE, "§7This NPC has no action set!"),
                 new ArrayList<>()
         );
+
+        sender.sendMessage(plugin.getMiniMessage().deserialize(
+                plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
+                        "<yellow>Creating NPC: <white>" + id + " <yellow>(fetching skin for " + username + "...)"
+        ));
 
         npcManager.spawnNPC(npc);
 
         sender.sendMessage(plugin.getMiniMessage().deserialize(
                 plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                        "<green>Created NPC: <white>" + id + "</green>"
+                        "<green>✓ Created NPC: <white>" + id
         ));
         sender.sendMessage(Component.text(
-                "Set an action with: /npc action " + id + " <type> <data>",
+                "Next steps:",
+                NamedTextColor.GRAY
+        ));
+        sender.sendMessage(Component.text(
+                "  1. Set an action: /npc action " + id + " GUI game_selector",
+                NamedTextColor.GRAY
+        ));
+        sender.sendMessage(Component.text(
+                "  2. Add hologram: /npc hologram " + id + " add <text>",
                 NamedTextColor.GRAY
         ));
     }
@@ -127,6 +146,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         if (npcManager.getNPC(id) == null) {
             sender.sendMessage(Component.text("NPC '" + id + "' not found!", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Use /npc list to see all NPCs", NamedTextColor.GRAY));
             return;
         }
 
@@ -134,7 +154,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(plugin.getMiniMessage().deserialize(
                 plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                        "<green>Removed NPC: <white>" + id
+                        "<green>✓ Removed NPC: <white>" + id
         ));
     }
 
@@ -143,6 +163,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         if (npcs.isEmpty()) {
             sender.sendMessage(Component.text("No NPCs found!", NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Create one with: /npc create <id> <username>", NamedTextColor.GRAY));
             return;
         }
 
@@ -150,9 +171,17 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         for (CustomNPC npc : npcs.values()) {
             sender.sendMessage(Component.text(
-                    "• " + npc.getId() + " - " + npc.getName() +
-                            " (" + npc.getAction().getType() + ")",
+                    "• " + npc.getId() + " §7- §f" + npc.getName() +
+                            " §7(" + npc.getAction().getType() + ")",
                     NamedTextColor.GRAY
+            ));
+
+            // Show location
+            var loc = npc.getLocation();
+            sender.sendMessage(Component.text(
+                    "  Location: " + loc.getWorld().getName() + " " +
+                            loc.getBlockX() + ", " + loc.getBlockY() + ", " + loc.getBlockZ(),
+                    NamedTextColor.DARK_GRAY
             ));
         }
     }
@@ -164,7 +193,23 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                     NamedTextColor.RED
             ));
             sender.sendMessage(Component.text(
-                    "Types: TELEPORT, COMMAND, GUI, MESSAGE",
+                    "Types:",
+                    NamedTextColor.GRAY
+            ));
+            sender.sendMessage(Component.text(
+                    "  GUI <menu> - Opens a menu (game_selector, cosmetics, stats)",
+                    NamedTextColor.GRAY
+            ));
+            sender.sendMessage(Component.text(
+                    "  MESSAGE <text> - Sends a message",
+                    NamedTextColor.GRAY
+            ));
+            sender.sendMessage(Component.text(
+                    "  TELEPORT <world,x,y,z,yaw,pitch> - Teleports player",
+                    NamedTextColor.GRAY
+            ));
+            sender.sendMessage(Component.text(
+                    "  COMMAND <command> - Runs a command",
                     NamedTextColor.GRAY
             ));
             return;
@@ -199,16 +244,16 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
             sender.sendMessage(plugin.getMiniMessage().deserialize(
                     plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                            "<green>Updated NPC action!"
+                            "<green>✓ Updated NPC action!"
             ));
             sender.sendMessage(Component.text(
-                    "Action: " + type + " -> " + data,
+                    "Action: " + type + " → " + data,
                     NamedTextColor.GRAY
             ));
 
         } catch (IllegalArgumentException e) {
             sender.sendMessage(Component.text(
-                    "Invalid action type! Use: TELEPORT, COMMAND, GUI, MESSAGE",
+                    "Invalid action type! Use: GUI, MESSAGE, TELEPORT, COMMAND",
                     NamedTextColor.RED
             ));
         }
@@ -244,11 +289,11 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                 String line = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
                 hologramLines.add(line);
 
-                sender.sendMessage(Component.text("Added hologram line!", NamedTextColor.GREEN));
+                sender.sendMessage(Component.text("✓ Added hologram line!", NamedTextColor.GREEN));
             }
             case "clear" -> {
                 hologramLines.clear();
-                sender.sendMessage(Component.text("Cleared hologram lines!", NamedTextColor.GREEN));
+                sender.sendMessage(Component.text("✓ Cleared hologram lines!", NamedTextColor.GREEN));
             }
             default -> {
                 sender.sendMessage(Component.text("Invalid action! Use: add, clear", NamedTextColor.RED));
@@ -304,18 +349,18 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         npcManager.removeNPC(id);
         npcManager.spawnNPC(updatedNPC);
 
-        sender.sendMessage(Component.text("Teleported NPC to your location!", NamedTextColor.GREEN));
+        sender.sendMessage(Component.text("✓ Teleported NPC to your location!", NamedTextColor.GREEN));
     }
 
     private void sendHelp(CommandSender sender) {
         sender.sendMessage(Component.text("=== NPC Commands ===", NamedTextColor.GOLD));
-        sender.sendMessage(Component.text("/npc create <id> <name> - Create NPC", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("/npc create <id> <username> - Create NPC with player skin", NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/npc remove <id> - Remove NPC", NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/npc list - List all NPCs", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/npc action <id> <type> <data> - Set action", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/npc hologram <id> add <line> - Add hologram", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("/npc action <id> <type> <data> - Set NPC action", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("/npc hologram <id> add <line> - Add hologram line", NamedTextColor.GRAY));
         sender.sendMessage(Component.text("/npc hologram <id> clear - Clear hologram", NamedTextColor.GRAY));
-        sender.sendMessage(Component.text("/npc teleporthere <id> - Move NPC", NamedTextColor.GRAY));
+        sender.sendMessage(Component.text("/npc teleporthere <id> - Move NPC to you", NamedTextColor.GRAY));
     }
 
     @Override
@@ -335,11 +380,15 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("action")) {
-            return Arrays.asList("TELEPORT", "COMMAND", "GUI", "MESSAGE");
+            return Arrays.asList("GUI", "MESSAGE", "TELEPORT", "COMMAND");
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("hologram")) {
             return Arrays.asList("add", "clear");
+        }
+
+        if (args.length == 4 && args[0].equalsIgnoreCase("action") && args[2].equalsIgnoreCase("GUI")) {
+            return Arrays.asList("game_selector", "cosmetics", "stats");
         }
 
         return List.of();

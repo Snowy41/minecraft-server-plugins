@@ -14,22 +14,43 @@ import org.bukkit.metadata.FixedMetadataValue;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages custom NPCs (player entities with skins).
+ * Manages custom NPCs that look like real players with skins.
+ * NPCs are persisted to npcs.yml and respawn on server restart.
  */
 public class NPCManager {
 
     private final LobbyPlugin plugin;
     private final Map<String, CustomNPC> npcs;
     private final Map<UUID, String> entityToNPC; // Maps entity UUID to NPC ID
+    private final NPCStorage storage;
 
     public NPCManager(LobbyPlugin plugin) {
         this.plugin = plugin;
         this.npcs = new ConcurrentHashMap<>();
         this.entityToNPC = new ConcurrentHashMap<>();
+        this.storage = new NPCStorage(plugin);
+
+        // Load NPCs from storage on initialization
+        loadNPCs();
+    }
+
+    /**
+     * Loads all NPCs from storage and spawns them.
+     */
+    private void loadNPCs() {
+        List<CustomNPC> loadedNPCs = storage.loadNPCs();
+        for (CustomNPC npc : loadedNPCs) {
+            spawnNPC(npc);
+        }
+        plugin.getLogger().info("Loaded " + loadedNPCs.size() + " NPCs from storage");
     }
 
     /**
@@ -40,38 +61,90 @@ public class NPCManager {
     public void spawnNPC(@NotNull CustomNPC npc) {
         Location location = npc.getLocation();
 
-        // Spawn the NPC as a player entity
-        Player npcPlayer = spawnPlayerNPC(npc);
+        // Fetch skin asynchronously if needed
+        if (npc.getSkinTexture() == null && npc.getName() != null) {
+            // Try to fetch skin from Mojang API
+            fetchSkinFromUsername(npc.getName()).thenAccept(skinData -> {
+                if (skinData != null) {
+                    // Update NPC with fetched skin
+                    CustomNPC updatedNPC = new CustomNPC(
+                            npc.getId(),
+                            npc.getName(),
+                            npc.getLocation(),
+                            skinData[0], // texture
+                            skinData[1], // signature
+                            npc.getAction(),
+                            npc.getHologramLines()
+                    );
 
-        if (npcPlayer != null) {
-            npc.setEntityUUID(npcPlayer.getUniqueId());
-            entityToNPC.put(npcPlayer.getUniqueId(), npc.getId());
-
-            // Spawn hologram above NPC
-            if (!npc.getHologramLines().isEmpty()) {
-                spawnHologram(npc, location.clone().add(0, 2.3, 0));
-            }
-
-            npcs.put(npc.getId(), npc);
-            plugin.getLogger().info("Spawned NPC: " + npc.getId() + " at " +
-                    location.getWorld().getName() + " " +
-                    location.getBlockX() + ", " +
-                    location.getBlockY() + ", " +
-                    location.getBlockZ());
+                    // Spawn the NPC with skin
+                    spawnNPCEntity(updatedNPC);
+                } else {
+                    // Spawn without skin
+                    spawnNPCEntity(npc);
+                }
+            });
+        } else {
+            // Spawn immediately with existing skin data
+            spawnNPCEntity(npc);
         }
     }
 
     /**
-     * Spawns a player NPC using packets (Paper API).
-     * Note: This creates an actual player entity with custom skin.
+     * Actually spawns the NPC entity in the world.
      */
-    private Player spawnPlayerNPC(CustomNPC npc) {
-        Location loc = npc.getLocation();
+    private void spawnNPCEntity(@NotNull CustomNPC npc) {
+        Location location = npc.getLocation();
 
-        // Create player profile with custom skin
+        // Spawn armor stand as the NPC body
+        ArmorStand npcEntity = (ArmorStand) location.getWorld().spawnEntity(location, EntityType.ARMOR_STAND);
+
+        // Configure armor stand to look like a player
+        npcEntity.setVisible(false); // Invisible armor stand
+        npcEntity.setGravity(false);
+        npcEntity.setInvulnerable(true);
+        npcEntity.setCustomNameVisible(false);
+        npcEntity.customName(plugin.getMiniMessage().deserialize(npc.getName()));
+        npcEntity.setCollidable(false);
+        npcEntity.setCanPickupItems(false);
+        npcEntity.setMarker(true); // Smaller hitbox
+
+        // Add player head with skin
+        if (npc.hasSkin()) {
+            addPlayerHead(npcEntity, npc);
+        }
+
+        // Mark as NPC
+        npcEntity.setMetadata("CustomNPC", new FixedMetadataValue(plugin, npc.getId()));
+
+        npc.setEntityUUID(npcEntity.getUniqueId());
+        entityToNPC.put(npcEntity.getUniqueId(), npc.getId());
+
+        // Spawn hologram above NPC
+        if (!npc.getHologramLines().isEmpty()) {
+            spawnHologram(npc, location.clone().add(0, 2.0, 0));
+        }
+
+        npcs.put(npc.getId(), npc);
+
+        // Save to storage
+        storage.saveNPCs(new ArrayList<>(npcs.values()));
+
+        plugin.getLogger().info("Spawned NPC: " + npc.getId() + " at " +
+                location.getWorld().getName() + " " +
+                location.getBlockX() + ", " +
+                location.getBlockY() + ", " +
+                location.getBlockZ());
+    }
+
+    /**
+     * Adds a player head to the armor stand using the NPC's skin.
+     */
+    private void addPlayerHead(ArmorStand stand, CustomNPC npc) {
+        // Create player profile with skin
         PlayerProfile profile = Bukkit.createProfile(UUID.randomUUID(), npc.getName());
 
-        if (npc.hasSkin()) {
+        if (npc.getSkinTexture() != null && npc.getSkinSignature() != null) {
             profile.setProperty(new ProfileProperty(
                     "textures",
                     npc.getSkinTexture(),
@@ -79,32 +152,72 @@ public class NPCManager {
             ));
         }
 
-        // For now, we'll use armor stands with player heads as a workaround
-        // A full implementation would require NMS/ProtocolLib for actual player NPCs
-        // This is a simplified version that works without additional dependencies
+        // Create player head item
+        org.bukkit.inventory.ItemStack head = new org.bukkit.inventory.ItemStack(org.bukkit.Material.PLAYER_HEAD);
+        org.bukkit.inventory.meta.SkullMeta meta = (org.bukkit.inventory.meta.SkullMeta) head.getItemMeta();
 
-        ArmorStand stand = (ArmorStand) loc.getWorld().spawnEntity(loc, EntityType.ARMOR_STAND);
-        stand.setVisible(false);
-        stand.setGravity(false);
-        stand.setInvulnerable(true);
-        stand.setCustomNameVisible(true);
-        stand.customName(plugin.getMiniMessage().deserialize(npc.getName()));
-        stand.setCollidable(false);
-        stand.setMarker(true);
+        if (meta != null) {
+            meta.setPlayerProfile(profile);
+            head.setItemMeta(meta);
 
-        // Mark as NPC
-        stand.setMetadata("CustomNPC", new FixedMetadataValue(plugin, npc.getId()));
+            // Set as helmet
+            stand.getEquipment().setHelmet(head);
+        }
+    }
 
-        return null; // TODO: Implement full player NPC with packets
+    /**
+     * Fetches skin data from Mojang API for a given username.
+     * Returns [texture, signature] or null if not found.
+     */
+    private CompletableFuture<String[]> fetchSkinFromUsername(String username) {
+        return CompletableFuture.supplyAsync(() -> {
+            try {
+                // Try to get player profile from Bukkit (if they've joined before)
+                Player onlinePlayer = Bukkit.getPlayerExact(username);
+                if (onlinePlayer != null) {
+                    PlayerProfile profile = onlinePlayer.getPlayerProfile();
+                    if (profile.hasTextures()) {
+                        Collection<ProfileProperty> textures = profile.getProperties();
+                        for (ProfileProperty prop : textures) {
+                            if (prop.getName().equals("textures")) {
+                                return new String[]{prop.getValue(), prop.getSignature()};
+                            }
+                        }
+                    }
+                }
+
+                // Try offline player
+                org.bukkit.OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(username);
+                if (offlinePlayer.hasPlayedBefore()) {
+                    PlayerProfile profile = offlinePlayer.getPlayerProfile();
+                    if (profile.hasTextures()) {
+                        Collection<ProfileProperty> textures = profile.getProperties();
+                        for (ProfileProperty prop : textures) {
+                            if (prop.getName().equals("textures")) {
+                                return new String[]{prop.getValue(), prop.getSignature()};
+                            }
+                        }
+                    }
+                }
+
+                plugin.getLogger().warning("Could not fetch skin for username: " + username);
+                return null;
+
+            } catch (Exception e) {
+                plugin.getLogger().warning("Error fetching skin for " + username + ": " + e.getMessage());
+                return null;
+            }
+        });
     }
 
     /**
      * Spawns a hologram (text display) above the NPC.
      */
     private void spawnHologram(CustomNPC npc, Location startLocation) {
-        double spacing = 0.3; // Space between lines
+        double spacing = 0.25; // Space between lines
         Location currentLoc = startLocation.clone();
 
+        // Spawn lines from bottom to top
         for (int i = npc.getHologramLines().size() - 1; i >= 0; i--) {
             String line = npc.getHologramLines().get(i);
 
@@ -118,6 +231,7 @@ public class NPCManager {
             hologramLine.customName(plugin.getMiniMessage().deserialize(line));
             hologramLine.setMarker(true);
             hologramLine.setCollidable(false);
+            hologramLine.setCanPickupItems(false);
 
             // Mark as hologram
             hologramLine.setMetadata("CustomNPC_Hologram", new FixedMetadataValue(plugin, npc.getId()));
@@ -153,6 +267,9 @@ public class NPCManager {
                 .filter(e -> e.hasMetadata("CustomNPC_Hologram"))
                 .filter(e -> e.getMetadata("CustomNPC_Hologram").get(0).asString().equals(npcId))
                 .forEach(Entity::remove);
+
+        // Save to storage
+        storage.saveNPCs(new ArrayList<>(npcs.values()));
 
         plugin.getLogger().info("Removed NPC: " + npcId);
     }
@@ -216,7 +333,7 @@ public class NPCManager {
      */
     public void reloadNPCs() {
         removeAllNPCs();
-        // Load NPCs from config (implemented in config loader)
+        loadNPCs();
     }
 
     /**

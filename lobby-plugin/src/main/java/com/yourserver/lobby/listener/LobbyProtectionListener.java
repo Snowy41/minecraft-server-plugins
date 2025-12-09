@@ -213,6 +213,7 @@ public class LobbyProtectionListener implements Listener {
     /**
      * Keep time always day if configured.
      * Uses TimeSkipEvent (Paper-specific event when time naturally changes).
+     * IMPORTANT: We only CANCEL the event here. The TimeManager handles setting the time.
      */
     @EventHandler(priority = EventPriority.HIGH)
     public void onTimeSkip(org.bukkit.event.world.TimeSkipEvent event) {
@@ -220,11 +221,9 @@ public class LobbyProtectionListener implements Listener {
             return;
         }
 
-        // Cancel natural time progression
+        // Cancel natural time progression (sleeping, commands, etc.)
+        // The TimeManager task will keep the time at the configured value
         event.setCancelled(true);
-
-        // Set to configured day time
-        event.getWorld().setTime(config.getProtectionConfig().getDayTime());
     }
 
     @EventHandler(priority = EventPriority.MONITOR)

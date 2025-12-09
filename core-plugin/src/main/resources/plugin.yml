@@ -1,0 +1,35 @@
+name: CorePlugin
+version: '1.0.0'
+main: com.yourteam.core.CorePlugin
+api-version: '1.21'
+author: MCBZH
+description: Core infrastructure plugin providing database, Redis, and player data management
+
+# Load before other plugins
+load: STARTUP
+loadbefore:
+  - LobbyPlugin
+  - BattleRoyalePlugin
+
+# Soft dependencies (plugins that can optionally be present)
+softdepend:
+  - LuckPerms
+  - Vault
+
+commands:
+  core:
+    description: Core plugin management commands
+    usage: /<command> [reload|status|debug]
+    permission: core.admin
+    aliases: [coreplugin]
+
+permissions:
+  core.admin:
+    description: Access to core plugin administration
+    default: op
+  core.reload:
+    description: Reload core plugin configuration
+    default: op
+  core.debug:
+    description: View debug information
+    default: op

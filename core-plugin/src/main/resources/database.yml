@@ -1,0 +1,62 @@
+# MySQL Database Configuration
+mysql:
+  # Database connection settings
+  host: "localhost"
+  port: 3306
+  database: "minecraft_server"
+  username: "minecraft"
+  password: "your_password_here"
+
+  # Connection pool settings (HikariCP)
+  pool:
+    # Maximum number of connections in the pool
+    maximum-pool-size: 10
+
+    # Minimum number of idle connections
+    minimum-idle: 2
+
+    # Maximum time (ms) to wait for a connection
+    connection-timeout: 30000
+
+    # Maximum time (ms) a connection can be idle
+    idle-timeout: 600000
+
+    # Maximum lifetime (ms) of a connection in the pool
+    max-lifetime: 1800000
+
+  # Connection properties for performance
+  properties:
+    cachePrepStmts: true
+    prepStmtCacheSize: 250
+    prepStmtCacheSqlLimit: 2048
+    useServerPrepStmts: true
+    useLocalSessionState: true
+    rewriteBatchedStatements: true
+    cacheResultSetMetadata: true
+    cacheServerConfiguration: true
+    elideSetAutoCommits: true
+    maintainTimeStats: false
+
+# Redis Configuration
+redis:
+  # Redis connection settings
+  host: "localhost"
+  port: 6379
+  password: "your_redis_password_here"
+
+  # Connection pool settings (Lettuce)
+  pool:
+    max-total: 20
+    max-idle: 10
+    min-idle: 2
+
+  # Key prefix for this server network
+  key-prefix: "mcserver:"
+
+  # Pub/Sub channels
+  channels:
+    server-heartbeat: "server:heartbeat"
+    game-state: "game:state"
+    player-queue: "player:queue"
+    player-stats: "player:stats"
+    server-command: "server:command"

@@ -12,6 +12,7 @@ allprojects {
         maven("https://repo.papermc.io/repository/maven-public/")
         maven("https://repo.dmulloy2.net/repository/public/")
         maven("https://oss.sonatype.org/content/groups/public/")
+        maven("https://jitpack.io") // Add this for MockBukkit
     }
 }
 

@@ -1,6 +1,7 @@
 plugins {
     java
     id("com.github.johnrengelman.shadow")
+    jacoco // Code coverage
 }
 
 dependencies {
@@ -31,10 +32,52 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.12")
 
     // Testing
-    testImplementation("com.github.seeseemelk:MockBukkit-v1.21:3.9.0")
+    testImplementation("com.github.seeseemelk:MockBukkit-v1.20:3.9.0") // Use v1.20 (stable)
+    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
+    testImplementation("org.mockito:mockito-core:5.11.0")
+    testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
+
+    // For integration tests with H2 in-memory database
+    testImplementation("com.h2database:h2:2.2.224")
 }
 
 tasks {
+    test {
+        useJUnitPlatform()
+
+        // Show test output
+        testLogging {
+            events("passed", "skipped", "failed")
+            exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
+            showStandardStreams = false
+        }
+
+        // Fail build if tests fail
+        ignoreFailures = false
+
+        // Generate report
+        finalizedBy(jacocoTestReport)
+    }
+
+    jacocoTestReport {
+        dependsOn(test)
+        reports {
+            xml.required.set(true)
+            html.required.set(true)
+            html.outputLocation.set(layout.buildDirectory.dir("reports/jacoco"))
+        }
+    }
+
+    jacocoTestCoverageVerification {
+        violationRules {
+            rule {
+                limit {
+                    minimum = "0.70".toBigDecimal() // 70% coverage minimum
+                }
+            }
+        }
+    }
+
     shadowJar {
         archiveBaseName.set("CorePlugin")
         archiveClassifier.set("")
@@ -53,5 +96,16 @@ tasks {
 
     build {
         dependsOn(shadowJar)
+    }
+
+    // Custom task to run tests and open coverage report
+    register("testWithReport") {
+        dependsOn(test, jacocoTestReport)
+        doLast {
+            val reportFile = layout.buildDirectory.file("reports/jacoco/index.html").get().asFile
+            if (reportFile.exists()) {
+                println("Coverage report: ${reportFile.absolutePath}")
+            }
+        }
     }
 }

@@ -1,6 +1,6 @@
 name: CorePlugin
 version: '1.0.0'
-main: com.yourteam.core.CorePlugin
+main: com.yourserver.core.CorePlugin
 api-version: '1.21'
 author: MCBZH
 description: Core infrastructure plugin providing database, Redis, and player data management

@@ -1,11 +1,11 @@
 # MySQL Database Configuration
 mysql:
   # Database connection settings
-  host: "localhost"
+  host: "sql7.freesqldatabase.com"
   port: 3306
-  database: "minecraft_server"
-  username: "minecraft"
-  password: "your_password_here"
+  database: "sql7811191"
+  username: "sql7811191"
+  password: "8vNiLJzIvs"
 
   # Connection pool settings (HikariCP)
   pool:
@@ -42,7 +42,7 @@ redis:
   # Redis connection settings
   host: "localhost"
   port: 6379
-  password: "your_redis_password_here"
+  password: ""
 
   # Connection pool settings (Lettuce)
   pool:

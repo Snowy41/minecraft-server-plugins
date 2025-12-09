@@ -1,0 +1,128 @@
+package com.yourserver.lobby.listener;
+
+import com.yourserver.lobby.LobbyPlugin;
+import com.yourserver.lobby.cosmetics.CosmeticsManager;
+import com.yourserver.lobby.scoreboard.ScoreboardManager;
+import com.yourserver.lobby.spawn.SpawnManager;
+import com.yourserver.lobby.tablist.TabListManager;
+import com.yourserver.lobby.util.ItemBuilder;
+import net.kyori.adventure.text.Component;
+import org.bukkit.GameMode;
+import org.bukkit.Material;
+import org.bukkit.entity.Player;
+import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
+import org.bukkit.event.Listener;
+import org.bukkit.event.player.PlayerJoinEvent;
+import org.bukkit.event.player.PlayerQuitEvent;
+import org.bukkit.inventory.ItemStack;
+
+/**
+ * Handles player join/quit events for lobby functionality.
+ */
+public class PlayerConnectionListener implements Listener {
+
+    private final LobbyPlugin plugin;
+    private final SpawnManager spawnManager;
+    private final ScoreboardManager scoreboardManager;
+    private final TabListManager tabListManager;
+    private final CosmeticsManager cosmeticsManager;
+
+    public PlayerConnectionListener(
+            LobbyPlugin plugin,
+            SpawnManager spawnManager,
+            ScoreboardManager scoreboardManager,
+            TabListManager tabListManager,
+            CosmeticsManager cosmeticsManager
+    ) {
+        this.plugin = plugin;
+        this.spawnManager = spawnManager;
+        this.scoreboardManager = scoreboardManager;
+        this.tabListManager = tabListManager;
+        this.cosmeticsManager = cosmeticsManager;
+    }
+
+    @EventHandler(priority = EventPriority.HIGH)
+    public void onPlayerJoin(PlayerJoinEvent event) {
+        Player player = event.getPlayer();
+
+        // Teleport to spawn
+        if (spawnManager.isSpawnSet()) {
+            spawnManager.teleportToSpawn(player);
+        }
+
+        // Set gamemode to adventure
+        player.setGameMode(GameMode.ADVENTURE);
+
+        // Reset player state
+        player.setHealth(20.0);
+        player.setFoodLevel(20);
+        player.setSaturation(20.0f);
+        player.setFireTicks(0);
+        player.setFallDistance(0);
+
+        // Give join items
+        giveJoinItems(player);
+
+        // Set up scoreboard
+        if (plugin.getLobbyConfig().getScoreboardConfig().isEnabled()) {
+            scoreboardManager.createScoreboard(player);
+        }
+
+        // Set up tab list
+        if (plugin.getLobbyConfig().getTabListConfig().isEnabled()) {
+            tabListManager.updatePlayer(player);
+        }
+
+        // Custom join message (optional)
+        event.joinMessage(null); // Remove default join message
+    }
+
+    @EventHandler(priority = EventPriority.MONITOR)
+    public void onPlayerQuit(PlayerQuitEvent event) {
+        Player player = event.getPlayer();
+
+        // Remove scoreboard
+        scoreboardManager.removeScoreboard(player);
+
+        // Remove cosmetics
+        cosmeticsManager.removeTrail(player);
+
+        // Custom quit message (optional)
+        event.quitMessage(null); // Remove default quit message
+    }
+
+    /**
+     * Gives join items to the player.
+     */
+    private void giveJoinItems(Player player) {
+        var joinItemsConfig = plugin.getLobbyConfig().getJoinItemsConfig();
+
+        if (!joinItemsConfig.isEnabled()) {
+            return;
+        }
+
+        // Clear inventory if configured
+        if (joinItemsConfig.isClearInventory()) {
+            player.getInventory().clear();
+        }
+
+        // Give configured items
+        for (var itemConfig : joinItemsConfig.getItems()) {
+            try {
+                Material material = Material.valueOf(itemConfig.getMaterial());
+
+                ItemStack item = new ItemBuilder(material)
+                        .name(plugin.getMiniMessage().deserialize(itemConfig.getName()))
+                        .lore(itemConfig.getLore().stream()
+                                .map(line -> plugin.getMiniMessage().deserialize(line))
+                                .toList())
+                        .build();
+
+                player.getInventory().setItem(itemConfig.getSlot(), item);
+            } catch (IllegalArgumentException e) {
+                plugin.getLogger().warning("Invalid material: " + itemConfig.getMaterial());
+            }
+        }
+    }
+}

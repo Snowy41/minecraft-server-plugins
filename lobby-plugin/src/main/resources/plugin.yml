@@ -1,0 +1,48 @@
+name: LobbyPlugin
+version: '${version}'
+main: com.yourserver.lobby.LobbyPlugin
+api-version: '1.21'
+author: MCBZH
+description: Lobby system with scoreboards, tab list, GUIs, and cosmetics
+
+# Depends on CorePlugin for database and Redis
+depend:
+  - CorePlugin
+
+# Soft dependencies (optional)
+softdepend:
+  - LuckPerms
+  - Vault
+
+# Load order
+load: POSTWORLD
+
+commands:
+  lobby:
+    description: Main lobby command
+    usage: /<command> [reload|setspawn]
+    permission: lobby.admin
+    aliases: [hub, l]
+
+  spawn:
+    description: Teleport to spawn
+    usage: /<command>
+    permission: lobby.spawn
+    aliases: [s]
+
+permissions:
+  lobby.admin:
+    description: Access to lobby admin commands
+    default: op
+
+  lobby.spawn:
+    description: Teleport to spawn
+    default: true
+
+  lobby.cosmetics:
+    description: Access to cosmetics
+    default: true
+
+  lobby.cosmetics.vip:
+    description: Access to VIP cosmetics
+    default: false

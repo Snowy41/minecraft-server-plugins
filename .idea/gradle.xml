@@ -10,6 +10,7 @@
             <option value="$PROJECT_DIR$" />
             <option value="$PROJECT_DIR$/api-module" />
             <option value="$PROJECT_DIR$/core-plugin" />
+            <option value="$PROJECT_DIR$/lobby-plugin" />
           </set>
         </option>
       </GradleProjectSettings>

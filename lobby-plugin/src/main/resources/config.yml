@@ -1,0 +1,203 @@
+# Lobby Plugin Configuration
+# Version: 1.0.0
+
+# Spawn location (set via /lobby setspawn or configure here)
+spawn:
+  world: "world"
+  x: -174.5  # Center between -23 and -326: (-23 + -326) / 2 = -174.5
+  y: -45.0   # Center between -60 and -30: (-60 + -30) / 2 = -45.0
+  z: -13.5   # Center between 130 and -157: (130 + -157) / 2 = -13.5
+  yaw: 0.0
+  pitch: 0.0
+
+# Lobby protection settings
+protection:
+  # Allow OPs to bypass all protection
+  op-bypass: true
+
+  # Prevent block breaking/placing
+  block-break: true
+  block-place: true
+
+  # Prevent item interactions
+  item-drop: true
+  item-pickup: true
+
+  # Prevent damage
+  player-damage: true
+  fall-damage: true
+  fire-damage: true
+  drowning-damage: true
+  void-damage: false  # Don't prevent void damage (teleport to spawn instead)
+
+  # Prevent combat
+  pvp: true
+
+  # Prevent hunger
+  hunger: true
+
+  # Prevent weather changes
+  weather-clear: true
+
+  # Teleport to spawn on void fall
+  void-teleport: true
+  void-y-level: -64
+
+  # Protected regions (your spawn area)
+  regions:
+    spawn:
+      enabled: true
+      min:
+        x: -326
+        y: -60
+        z: -157
+      max:
+        x: -23
+        y: -30
+        z: 130
+
+# Scoreboard configuration
+scoreboard:
+  enabled: true
+
+  # Update interval in ticks (10 ticks = 0.5 seconds)
+  update-interval: 10
+
+  # Title (supports MiniMessage format)
+  title: "<gradient:#FFD700:#FFA500><bold>YOUR SERVER</bold></gradient>"
+
+  # Lines (supports MiniMessage and placeholders)
+  # Available placeholders: {player}, {online}, {max_players}, {rank}
+  lines:
+    - ""
+    - "<gray>Player: <white>{player}"
+    - "<gray>Rank: {rank}"
+    - ""
+    - "<gray>Online: <green>{online}<gray>/<green>{max_players}"
+    - ""
+    - "<yellow>play.yourserver.com"
+    - ""
+
+# Tab list configuration
+tablist:
+  enabled: true
+
+  # Update interval in ticks (20 ticks = 1 second)
+  update-interval: 20
+
+  # Header (supports MiniMessage format and placeholders)
+  header:
+    - ""
+    - "<gradient:#FFD700:#FFA500><bold>YOUR SERVER</bold></gradient>"
+    - "<gray>Welcome, <white>{player}"
+    - ""
+
+  # Footer
+  footer:
+    - ""
+    - "<gray>Online: <green>{online}<gray>/<green>{max_players}"
+    - "<yellow>play.yourserver.com"
+    - ""
+
+# GUI configuration
+gui:
+  enabled: true
+
+  # Give compass on join
+  give-compass: true
+
+  # Compass item settings
+  compass:
+    slot: 4
+    name: "<gradient:#FFD700:#FFA500><bold>Game Selector</bold></gradient>"
+    lore:
+      - ""
+      - "<gray>Right-click to open"
+      - "<gray>the game menu!"
+      - ""
+
+# Items given on join
+join-items:
+  enabled: true
+  clear-inventory: true
+
+  items:
+    - slot: 0
+      material: COMPASS
+      name: "<gradient:#FFD700:#FFA500><bold>Game Selector</bold></gradient>"
+      lore:
+        - "<gray>Right-click to select a game!"
+
+    - slot: 8
+      material: NETHER_STAR
+      name: "<gradient:#FF1493:#9370DB><bold>Cosmetics</bold></gradient>"
+      lore:
+        - "<gray>Right-click to customize"
+        - "<gray>your appearance!"
+
+# Cosmetics configuration
+cosmetics:
+  enabled: true
+
+  # Particle trails
+  trails:
+    enabled: true
+
+    # Particle spawn rate (particles per tick)
+    spawn-rate: 1
+
+    # Available trails (permission: lobby.cosmetics.trail.<id>)
+    available:
+      flame:
+        name: "<gold>Flame Trail"
+        particle: FLAME
+        permission: "lobby.cosmetics.trail.flame"
+        vip: false
+
+      heart:
+        name: "<light_purple>Heart Trail"
+        particle: HEART
+        permission: "lobby.cosmetics.trail.heart"
+        vip: false
+
+      enchant:
+        name: "<aqua>Enchant Trail"
+        particle: ENCHANT
+        permission: "lobby.cosmetics.trail.enchant"
+        vip: true
+
+      portal:
+        name: "<dark_purple>Portal Trail"
+        particle: PORTAL
+        permission: "lobby.cosmetics.trail.portal"
+        vip: true
+
+      note:
+        name: "<green>Note Trail"
+        particle: NOTE
+        permission: "lobby.cosmetics.trail.note"
+        vip: false
+
+      redstone:
+        name: "<red>Redstone Trail"
+        particle: DUST
+        permission: "lobby.cosmetics.trail.redstone"
+        vip: false
+
+# Messages (supports MiniMessage format)
+messages:
+  prefix: "<gradient:#FFD700:#FFA500>[Lobby]</gradient> "
+
+  spawn-teleport: "<green>Teleported to spawn!"
+  spawn-set: "<green>Spawn location set!"
+  spawn-not-set: "<red>Spawn location not set! Use /lobby setspawn"
+
+  config-reload: "<green>Configuration reloaded!"
+
+  no-permission: "<red>You don't have permission to do that!"
+
+  cosmetic-equipped: "<green>Equipped {cosmetic}!"
+  cosmetic-removed: "<gray>Cosmetic removed!"
+  cosmetic-locked: "<red>This cosmetic is locked! <gray>(Requires VIP)"
+
+  void-teleport: "<yellow>You fell into the void! Teleporting to spawn..."

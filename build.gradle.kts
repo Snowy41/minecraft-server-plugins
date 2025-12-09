@@ -1,6 +1,6 @@
 plugins {
     java
-    id("com.github.johnrengelman.shadow") version "8.1.1" apply false
+    id("com.gradleup.shadow") version "8.3.5" apply false  // Updated from com.github.johnrengelman.shadow
 }
 
 allprojects {
@@ -18,7 +18,7 @@ allprojects {
 
 subprojects {
     apply(plugin = "java")
-    apply(plugin = "com.github.johnrengelman.shadow")
+    apply(plugin = "com.gradleup.shadow")  // Updated plugin ID
 
     java {
         toolchain {

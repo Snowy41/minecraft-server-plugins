@@ -28,8 +28,7 @@ public class CorePlugin extends JavaPlugin {
     public void onLoad() {
         getLogger().info("Loading CorePlugin...");
 
-        // Save default configurations
-        saveDefaultConfig();
+        // Save database.yml only (removed config.yml as it doesn't exist)
         saveResource("database.yml", false);
     }
 
@@ -106,7 +105,6 @@ public class CorePlugin extends JavaPlugin {
      * Reloads the plugin configuration.
      */
     public void reloadConfiguration() {
-        reloadConfig();
         databaseConfig = DatabaseConfig.load(getDataFolder());
         getLogger().info("Configuration reloaded");
     }

@@ -91,6 +91,7 @@ public class DatabaseManager {
 
     /**
      * Creates database tables if they don't exist.
+     * FIXED: Removed DEFAULT CURRENT_TIMESTAMP from last_join to support older MySQL versions
      */
     private void createTables() {
         logger.info("Creating database tables if they don't exist...");
@@ -100,7 +101,7 @@ public class DatabaseManager {
                 uuid VARCHAR(36) PRIMARY KEY,
                 username VARCHAR(16) NOT NULL,
                 first_join TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                last_join TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                last_join TIMESTAMP NULL DEFAULT NULL,
                 playtime_seconds BIGINT DEFAULT 0,
                 INDEX idx_username (username)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

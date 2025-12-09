@@ -39,10 +39,10 @@ mysql:
 
 # Redis Configuration
 redis:
-  # Redis connection settings
-  host: "localhost"
-  port: 6379
-  password: ""
+  # Redis connection settings - UPDATED FOR REDIS CLOUD
+  host: "redis-13511.crce218.eu-central-1-1.ec2.cloud.redislabs.com"
+  port: 13511
+  password: "TUdVa4lhKdpQDIiI5ynKrb3ylzllqmmp"
 
   # Connection pool settings (Lettuce)
   pool:

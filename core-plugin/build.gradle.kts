@@ -1,7 +1,13 @@
 plugins {
     java
-    id("com.github.johnrengelman.shadow")
+    id("com.gradleup.shadow")  // Updated plugin ID
     jacoco // Code coverage
+}
+
+java {
+    toolchain {
+        languageVersion.set(JavaLanguageVersion.of(21))
+    }
 }
 
 dependencies {
@@ -20,10 +26,10 @@ dependencies {
     implementation("com.mysql:mysql-connector-j:8.3.0")
 
     // Redis
-    implementation("io.lettuce:lettuce-core:6.3.2.RELEASE")
+    implementation("io.lettuce:lettuce-core:6.2.7.RELEASE")
 
     // Caching
-    implementation("com.github.ben-manes.caffeine:caffeine:3.1.8")
+    implementation("com.github.ben-manes.caffeine:caffeine:3.1.6")
 
     // Configuration
     implementation("org.spongepowered:configurate-yaml:4.1.2")
@@ -32,7 +38,7 @@ dependencies {
     implementation("org.slf4j:slf4j-api:2.0.12")
 
     // Testing
-    testImplementation("com.github.seeseemelk:MockBukkit-v1.20:3.9.0") // Use v1.20 (stable)
+    testImplementation("com.github.seeseemelk:MockBukkit-v1.21:3.95.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("org.mockito:mockito-core:5.11.0")
     testImplementation("org.mockito:mockito-junit-jupiter:5.11.0")
@@ -87,11 +93,6 @@ tasks {
         relocate("io.lettuce", "com.yourserver.core.libs.lettuce")
         relocate("com.github.benmanes.caffeine", "com.yourserver.core.libs.caffeine")
         relocate("org.spongepowered.configurate", "com.yourserver.core.libs.configurate")
-
-        // Minimize jar size by excluding unused classes
-        minimize {
-            exclude(dependency("com.mysql:mysql-connector-j:.*"))
-        }
     }
 
     build {

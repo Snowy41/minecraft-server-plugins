@@ -39,10 +39,7 @@ public class PluginIsolationManager {
 
     /**
      * Loads plugins for a partition.
-     *
-     * For now, this "loads" by marking plugins as active for the partition.
-     * The plugins are already loaded by Bukkit, but we track which ones
-     * should be active in each partition.
+     * This marks plugins as active and hot-reloads them if needed.
      */
     public void loadPluginsForPartition(@NotNull Partition partition) {
         String partitionId = partition.getId();
@@ -54,21 +51,54 @@ public class PluginIsolationManager {
         // Track which plugins are active in this partition
         partitionPlugins.put(partitionId, pluginNames);
 
-        // Verify all plugins exist
+        // Verify and hot-reload plugins
         for (String pluginName : pluginNames) {
             Plugin targetPlugin = Bukkit.getPluginManager().getPlugin(pluginName);
 
             if (targetPlugin == null) {
-                plugin.getLogger().warning("Plugin not found: " + pluginName +
-                        " (specified for partition " + partitionId + ")");
+                plugin.getLogger().warning("  ✗ Plugin not found: " + pluginName);
             } else if (!targetPlugin.isEnabled()) {
-                plugin.getLogger().warning("Plugin is disabled: " + pluginName +
-                        " (specified for partition " + partitionId + ")");
+                plugin.getLogger().warning("  ✗ Plugin disabled: " + pluginName);
             } else {
                 plugin.getLogger().info("  ✓ " + pluginName + " active in partition");
+
+                // If plugin state indicates it needs reloading, do a soft reload
+                String state = pluginStates.get(pluginName);
+                if ("needs_reload".equals(state)) {
+                    plugin.getLogger().info("  ↻ Hot-reloading: " + pluginName);
+                    softReloadPlugin(targetPlugin);
+                    pluginStates.put(pluginName, "reloaded");
+                }
             }
         }
     }
+
+    /**
+     * Soft-reloads a plugin (calls onDisable then onEnable).
+     * This is safer than full hot-reload and works for most plugins.
+     */
+    private void softReloadPlugin(@NotNull Plugin targetPlugin) {
+        try {
+            plugin.getLogger().info("  - Calling onDisable()");
+            targetPlugin.onDisable();
+
+            // Small delay
+            try {
+                Thread.sleep(100);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+
+            plugin.getLogger().info("  - Calling onEnable()");
+            targetPlugin.onEnable();
+
+            plugin.getLogger().info("  ✓ Successfully reloaded: " + targetPlugin.getName());
+
+        } catch (Exception e) {
+            plugin.getLogger().severe("  ✗ Failed to reload " + targetPlugin.getName() + ": " + e.getMessage());
+        }
+    }
+
 
     /**
      * Unloads plugins for a partition.

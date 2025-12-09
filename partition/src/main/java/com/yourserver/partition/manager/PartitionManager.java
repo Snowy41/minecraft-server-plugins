@@ -20,16 +20,18 @@ public class PartitionManager {
 
     private final PartitionPlugin plugin;
     private final PartitionConfig config;
+    private final WorldManager worldManager;
     private final Map<String, Partition> partitions;
     private final Map<UUID, String> playerPartitions; // Player UUID -> Partition ID
     private final Map<String, String> worldPartitions; // World name -> Partition ID
 
-    public PartitionManager(PartitionPlugin plugin, PartitionConfig config) {
+    public PartitionManager(PartitionPlugin plugin, PartitionConfig config, WorldManager worldManager) {
         this.plugin = plugin;
         this.config = config;
         this.partitions = new ConcurrentHashMap<>();
         this.playerPartitions = new ConcurrentHashMap<>();
         this.worldPartitions = new ConcurrentHashMap<>();
+        this.worldManager = worldManager;
     }
 
     /**

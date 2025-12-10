@@ -4,6 +4,7 @@ import com.yourserver.partition.PartitionPlugin;
 import com.yourserver.partition.isolation.PartitionIsolationSystem;
 import com.yourserver.partition.manager.PartitionManager;
 import com.yourserver.partition.model.Partition;
+import com.yourserver.partition.plugin.PluginHotLoader;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
@@ -30,22 +31,21 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
     private final PartitionPlugin plugin;
     private final PartitionManager partitionManager;
     private final PartitionIsolationSystem isolationSystem; // ADD THIS FIELD
+    private final PluginHotLoader pluginHotLoader;
 
     public PartitionCommand(PartitionPlugin plugin,
                             PartitionManager partitionManager,
-                            PartitionIsolationSystem isolationSystem) {
+                            PartitionIsolationSystem isolationSystem,
+                            PluginHotLoader pluginHotLoader) { // ← ADD PARAMETER
         this.plugin = plugin;
         this.partitionManager = partitionManager;
-        this.isolationSystem = isolationSystem; // ADD THIS
+        this.isolationSystem = isolationSystem;
+        this.pluginHotLoader = pluginHotLoader;
     }
 
     @Override
-    public boolean onCommand(
-            @NotNull CommandSender sender,
-            @NotNull Command command,
-            @NotNull String label,
-            @NotNull String[] args
-    ) {
+    public boolean onCommand(@NotNull CommandSender sender, @NotNull Command command,
+                             @NotNull String label, @NotNull String[] args) {
         if (args.length == 0) {
             sendHelp(sender);
             return true;
@@ -57,8 +57,8 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
             case "list" -> handleList(sender);
             case "info" -> handleInfo(sender, args);
             case "tp", "teleport" -> handleTeleport(sender, args);
-            case "restart" -> handleRestartWithHotReload(sender, args);  // UPDATED!
-            case "return" -> handleReturn(sender);                        // NEW!
+            case "restart" -> handleRestartWithHotReload(sender, args);  // ← CHANGED!
+            case "return" -> handleReturn(sender);                        // ← NEW!
             case "reload" -> handleReload(sender);
             case "worlds" -> handleWorlds(sender);
             case "plugins" -> handlePlugins(sender, args);
@@ -142,9 +142,6 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
         pluginHotLoader.restartPartitionWithPluginReload(partitionId, player);
     }
 
-    /**
-     * NEW: Handles player returning after partition restart.
-     */
     private void handleReturn(CommandSender sender) {
         if (!(sender instanceof Player player)) {
             sender.sendMessage(Component.text("Only players can return to partitions!",
@@ -492,7 +489,8 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
     }
 
     private void sendHelp(CommandSender sender) {
-        sender.sendMessage(Component.text("=== Partition Commands ===", NamedTextColor.GOLD, TextDecoration.BOLD));
+        sender.sendMessage(Component.text("=== Partition Commands ===",
+                NamedTextColor.GOLD, TextDecoration.BOLD));
         sender.sendMessage(Component.empty());
         sender.sendMessage(Component.text("/partition list", NamedTextColor.YELLOW)
                 .append(Component.text(" - List all partitions", NamedTextColor.GRAY)));
@@ -501,7 +499,9 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/partition tp <partition>", NamedTextColor.YELLOW)
                 .append(Component.text(" - Teleport to partition", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/partition restart <partition>", NamedTextColor.YELLOW)
-                .append(Component.text(" - Restart partition", NamedTextColor.GRAY)));
+                .append(Component.text(" - Hot-reload partition", NamedTextColor.GRAY))); // ← CHANGED TEXT
+        sender.sendMessage(Component.text("/partition return", NamedTextColor.YELLOW)  // ← NEW
+                .append(Component.text(" - Return after restart", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/partition worlds", NamedTextColor.YELLOW)
                 .append(Component.text(" - List world mappings", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/partition plugins <partition>", NamedTextColor.YELLOW)
@@ -526,15 +526,11 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
 
     @Override
     @Nullable
-    public List<String> onTabComplete(
-            @NotNull CommandSender sender,
-            @NotNull Command command,
-            @NotNull String label,
-            @NotNull String[] args
-    ) {
+    public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
+                                      @NotNull String label, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("list", "info", "tp", "restart", "reload", "worlds", "plugins",
-                    "add", "enable", "disable");
+            return Arrays.asList("list", "info", "tp", "restart", "return", // ← ADD "return"
+                    "reload", "worlds", "plugins");
         }
 
         if (args.length == 2) {

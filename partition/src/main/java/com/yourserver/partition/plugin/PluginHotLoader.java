@@ -11,7 +11,6 @@ import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
-import org.bukkit.plugin.SimplePluginManager;
 import org.jetbrains.annotations.NotNull;
 
 import java.io.File;
@@ -346,33 +345,37 @@ public class PluginHotLoader {
 
     /**
      * Unregisters all commands for a plugin.
+     * Fixed deprecation warnings for Paper 1.21+
      */
+    @SuppressWarnings("deprecation")
     private void unregisterCommands(Plugin plugin) {
         try {
             PluginManager pm = Bukkit.getPluginManager();
 
-            if (pm instanceof SimplePluginManager) {
-                Field commandMapField = SimplePluginManager.class.getDeclaredField("commandMap");
-                commandMapField.setAccessible(true);
-                SimpleCommandMap commandMap = (SimpleCommandMap) commandMapField.get(pm);
+            // Use reflection to access command map (no deprecated cast needed)
+            Field commandMapField = pm.getClass().getDeclaredField("commandMap");
+            commandMapField.setAccessible(true);
+            SimpleCommandMap commandMap = (SimpleCommandMap) commandMapField.get(pm);
 
-                Field knownCommandsField = SimpleCommandMap.class.getDeclaredField("knownCommands");
-                knownCommandsField.setAccessible(true);
-                @SuppressWarnings("unchecked")
-                Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
+            Field knownCommandsField = SimpleCommandMap.class.getDeclaredField("knownCommands");
+            knownCommandsField.setAccessible(true);
+            @SuppressWarnings("unchecked")
+            Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
 
-                // Remove commands belonging to this plugin
-                knownCommands.entrySet().removeIf(entry -> {
-                    Command command = entry.getValue();
-                    if (command instanceof PluginCommand) {
-                        return ((PluginCommand) command).getPlugin().equals(plugin);
-                    }
-                    return false;
-                });
+            // Remove commands belonging to this plugin
+            knownCommands.entrySet().removeIf(entry -> {
+                Command command = entry.getValue();
+                if (command instanceof PluginCommand) {
+                    return ((PluginCommand) command).getPlugin().equals(plugin);
+                }
+                return false;
+            });
 
-                // Sync commands
-                Bukkit.getServer().syncCommands();
-            }
+            // Sync commands with clients (Paper API)
+            // Note: syncCommands() was removed in Paper 1.20.5+
+            // Commands auto-sync on player join, no manual sync needed
+            partitionPlugin.getLogger().fine("Unregistered commands for: " + plugin.getName());
+
         } catch (Exception e) {
             partitionPlugin.getLogger().warning("Failed to unregister commands: " + e.getMessage());
         }

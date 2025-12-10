@@ -117,7 +117,7 @@ public class PartitionManager {
         }
 
         // Load plugins for this partition
-        plugin.getPluginIsolationManager().loadPluginsForPartition(partition);
+        plugin.getPluginHotLoader().loadPluginsForPartition(partition);
 
         partitions.put(partitionId, partition);
         plugin.getLogger().info("Partition loaded: " + partitionId + " (" + partition.getName() + ")");
@@ -173,14 +173,14 @@ public class PartitionManager {
         }
 
         // Unload plugins
-        plugin.getPluginIsolationManager().unloadPluginsForPartition(partition);
+        plugin.getPluginHotLoader().unloadPluginsForPartition(partition);
 
-        // Remove world mappings
+        // Remove world mappings (existing code stays)
         for (String worldName : partition.getWorlds()) {
             worldPartitions.remove(worldName);
         }
 
-        // Remove partition
+        // Remove partition (existing code stays)
         partitions.remove(partitionId);
         plugin.getLogger().info("Partition unloaded: " + partitionId);
 

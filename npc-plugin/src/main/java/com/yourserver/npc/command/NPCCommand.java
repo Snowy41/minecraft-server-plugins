@@ -1,8 +1,8 @@
-package com.yourserver.lobby.command;
+package com.yourserver.npc.command;
 
-import com.yourserver.lobby.LobbyPlugin;
-import com.yourserver.lobby.npc.CustomNPC;
-import com.yourserver.lobby.npc.NPCManager;
+import com.yourserver.npc.NPCPlugin;
+import com.yourserver.npc.manager.NPCManager;
+import com.yourserver.npc.model.NPC;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.command.Command;
@@ -18,7 +18,7 @@ import java.util.Arrays;
 import java.util.List;
 
 /**
- * Command for managing custom NPCs.
+ * Command for managing NPCs.
  * /npc create <id> <name> - Creates NPC with player's skin
  * /npc remove <id>
  * /npc list
@@ -29,10 +29,10 @@ import java.util.List;
  */
 public class NPCCommand implements CommandExecutor, TabCompleter {
 
-    private final LobbyPlugin plugin;
+    private final NPCPlugin plugin;
     private final NPCManager npcManager;
 
-    public NPCCommand(LobbyPlugin plugin, NPCManager npcManager) {
+    public NPCCommand(NPCPlugin plugin, NPCManager npcManager) {
         this.plugin = plugin;
         this.npcManager = npcManager;
     }
@@ -44,7 +44,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
             @NotNull String label,
             @NotNull String[] args
     ) {
-        if (!sender.hasPermission("lobby.npc")) {
+        if (!sender.hasPermission("npc.admin")) {
             sender.sendMessage(Component.text("No permission!", NamedTextColor.RED));
             return true;
         }
@@ -100,27 +100,19 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // Create NPC at player's location
-        CustomNPC npc = new CustomNPC(
-                id,
-                username,
-                player.getLocation(),
-                null, // Skin will be fetched automatically
-                null,
-                new CustomNPC.NPCAction(CustomNPC.NPCAction.ActionType.MESSAGE, "§7This NPC has no action set!"),
-                new ArrayList<>()
-        );
+        // Create NPC at player's location with default message action
+        NPC.Action defaultAction = new NPC.Action(NPC.ActionType.MESSAGE, "§7This NPC has no action set!");
 
-        sender.sendMessage(plugin.getMiniMessage().deserialize(
-                plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                        "<yellow>Creating NPC: <white>" + id + " <yellow>(fetching skin for " + username + "...)"
+        sender.sendMessage(Component.text(
+                "Creating NPC: " + id + " (fetching skin for " + username + "...)",
+                NamedTextColor.YELLOW
         ));
 
-        npcManager.spawnNPC(npc);
+        npcManager.createNPC(id, username, player.getLocation(), defaultAction);
 
-        sender.sendMessage(plugin.getMiniMessage().deserialize(
-                plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                        "<green>✓ Created NPC: <white>" + id
+        sender.sendMessage(Component.text(
+                "✓ Created NPC: " + id,
+                NamedTextColor.GREEN
         ));
         sender.sendMessage(Component.text(
                 "Next steps:",
@@ -152,9 +144,9 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         npcManager.removeNPC(id);
 
-        sender.sendMessage(plugin.getMiniMessage().deserialize(
-                plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                        "<green>✓ Removed NPC: <white>" + id
+        sender.sendMessage(Component.text(
+                "✓ Removed NPC: " + id,
+                NamedTextColor.GREEN
         ));
     }
 
@@ -169,7 +161,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         sender.sendMessage(Component.text("=== NPCs (" + npcs.size() + ") ===", NamedTextColor.GOLD));
 
-        for (CustomNPC npc : npcs.values()) {
+        for (NPC npc : npcs) {
             sender.sendMessage(Component.text(
                     "• " + npc.getId() + " §7- §f" + npc.getName() +
                             " §7(" + npc.getAction().getType() + ")",
@@ -219,32 +211,30 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         String typeStr = args[2].toUpperCase();
         String data = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
 
-        CustomNPC npc = npcManager.getNPC(id);
+        NPC npc = npcManager.getNPC(id);
         if (npc == null) {
             sender.sendMessage(Component.text("NPC '" + id + "' not found!", NamedTextColor.RED));
             return;
         }
 
         try {
-            CustomNPC.NPCAction.ActionType type = CustomNPC.NPCAction.ActionType.valueOf(typeStr);
+            NPC.ActionType type = NPC.ActionType.valueOf(typeStr);
 
-            // Create new NPC with updated action
-            CustomNPC updatedNPC = new CustomNPC(
-                    npc.getId(),
-                    npc.getName(),
-                    npc.getLocation(),
-                    npc.getSkinTexture(),
-                    npc.getSkinSignature(),
-                    new CustomNPC.NPCAction(type, data),
-                    npc.getHologramLines()
-            );
-
+            // Remove old NPC and create new one with updated action
             npcManager.removeNPC(id);
-            npcManager.spawnNPC(updatedNPC);
 
-            sender.sendMessage(plugin.getMiniMessage().deserialize(
-                    plugin.getLobbyConfig().getMessagesConfig().getPrefix() +
-                            "<green>✓ Updated NPC action!"
+            NPC.Action newAction = new NPC.Action(type, data);
+            npcManager.createNPC(id, npc.getName(), npc.getLocation(), newAction);
+
+            // Re-add hologram lines
+            NPC updatedNPC = npcManager.getNPC(id);
+            for (String line : npc.getHologramLines()) {
+                updatedNPC.addHologramLine(line);
+            }
+
+            sender.sendMessage(Component.text(
+                    "✓ Updated NPC action!",
+                    NamedTextColor.GREEN
             ));
             sender.sendMessage(Component.text(
                     "Action: " + type + " → " + data,
@@ -271,13 +261,11 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         String id = args[1];
         String action = args[2].toLowerCase();
 
-        CustomNPC npc = npcManager.getNPC(id);
+        NPC npc = npcManager.getNPC(id);
         if (npc == null) {
             sender.sendMessage(Component.text("NPC '" + id + "' not found!", NamedTextColor.RED));
             return;
         }
-
-        List<String> hologramLines = new ArrayList<>(npc.getHologramLines());
 
         switch (action) {
             case "add" -> {
@@ -287,33 +275,33 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                 }
 
                 String line = String.join(" ", Arrays.copyOfRange(args, 3, args.length));
-                hologramLines.add(line);
+                npc.addHologramLine(line);
+
+                // Re-spawn NPC to update hologram
+                npcManager.removeNPC(id);
+                npcManager.createNPC(id, npc.getName(), npc.getLocation(), npc.getAction());
+
+                // Re-add all hologram lines
+                NPC updatedNPC = npcManager.getNPC(id);
+                for (String l : npc.getHologramLines()) {
+                    updatedNPC.addHologramLine(l);
+                }
 
                 sender.sendMessage(Component.text("✓ Added hologram line!", NamedTextColor.GREEN));
             }
             case "clear" -> {
-                hologramLines.clear();
+                npc.clearHologramLines();
+
+                // Re-spawn NPC without hologram
+                npcManager.removeNPC(id);
+                npcManager.createNPC(id, npc.getName(), npc.getLocation(), npc.getAction());
+
                 sender.sendMessage(Component.text("✓ Cleared hologram lines!", NamedTextColor.GREEN));
             }
             default -> {
                 sender.sendMessage(Component.text("Invalid action! Use: add, clear", NamedTextColor.RED));
-                return;
             }
         }
-
-        // Recreate NPC with updated hologram
-        CustomNPC updatedNPC = new CustomNPC(
-                npc.getId(),
-                npc.getName(),
-                npc.getLocation(),
-                npc.getSkinTexture(),
-                npc.getSkinSignature(),
-                npc.getAction(),
-                hologramLines
-        );
-
-        npcManager.removeNPC(id);
-        npcManager.spawnNPC(updatedNPC);
     }
 
     private void handleTeleportHere(CommandSender sender, String[] args) {
@@ -328,26 +316,22 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         }
 
         String id = args[1];
-        CustomNPC npc = npcManager.getNPC(id);
+        NPC npc = npcManager.getNPC(id);
 
         if (npc == null) {
             sender.sendMessage(Component.text("NPC '" + id + "' not found!", NamedTextColor.RED));
             return;
         }
 
-        // Recreate NPC at player's location
-        CustomNPC updatedNPC = new CustomNPC(
-                npc.getId(),
-                npc.getName(),
-                player.getLocation(),
-                npc.getSkinTexture(),
-                npc.getSkinSignature(),
-                npc.getAction(),
-                npc.getHologramLines()
-        );
-
+        // Remove old NPC and create at player's location
         npcManager.removeNPC(id);
-        npcManager.spawnNPC(updatedNPC);
+        npcManager.createNPC(id, npc.getName(), player.getLocation(), npc.getAction());
+
+        // Re-add hologram lines
+        NPC updatedNPC = npcManager.getNPC(id);
+        for (String line : npc.getHologramLines()) {
+            updatedNPC.addHologramLine(line);
+        }
 
         sender.sendMessage(Component.text("✓ Teleported NPC to your location!", NamedTextColor.GREEN));
     }
@@ -376,7 +360,9 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2 && !args[0].equalsIgnoreCase("create") && !args[0].equalsIgnoreCase("list")) {
-            return new ArrayList<>(npcManager.getAllNPCs().keySet());
+            return new ArrayList<>(npcManager.getAllNPCs().stream()
+                    .map(NPC::getId)
+                    .toList());
         }
 
         if (args.length == 3 && args[0].equalsIgnoreCase("action")) {

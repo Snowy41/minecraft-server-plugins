@@ -3,7 +3,7 @@ version: '${version}'
 main: com.yourserver.lobby.LobbyPlugin
 api-version: '1.21'
 author: MCBZH
-description: Lobby system with scoreboards, tab list, GUIs, cosmetics, and custom NPCs
+description: Lobby system with scoreboards, tab list, GUIs, and cosmetics
 
 # Depends on CorePlugin for database and Redis
 depend:
@@ -11,8 +11,7 @@ depend:
 
 # Soft dependencies (optional)
 softdepend:
-  - LuckPerms
-  - Vault
+  - NPCPlugin
 
 # Load order
 load: POSTWORLD
@@ -30,11 +29,6 @@ commands:
     permission: lobby.spawn
     aliases: [s]
 
-  npc:
-    description: Manage custom NPCs
-    usage: /<command> <create|remove|list|action|hologram|teleporthere>
-    permission: lobby.npc
-
 permissions:
   lobby.admin:
     description: Access to lobby admin commands
@@ -51,7 +45,3 @@ permissions:
   lobby.cosmetics.vip:
     description: Access to VIP cosmetics
     default: false
-
-  lobby.npc:
-    description: Manage custom NPCs
-    default: op

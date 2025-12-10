@@ -10,9 +10,7 @@ import com.yourserver.lobby.items.ItemToggleManager;
 import com.yourserver.lobby.listener.CompassClickListener;
 import com.yourserver.lobby.listener.LobbyProtectionListener;
 import com.yourserver.lobby.listener.NetherStarClickListener;
-import com.yourserver.lobby.listener.NPCInteractListener;
 import com.yourserver.lobby.listener.PlayerConnectionListener;
-import com.yourserver.lobby.npc.NPCManager;
 import com.yourserver.lobby.scoreboard.ScoreboardManager;
 import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
@@ -50,7 +48,6 @@ public class LobbyPlugin extends JavaPlugin {
     private GUIManager guiManager;
     private CosmeticsManager cosmeticsManager;
     private ItemToggleManager itemToggleManager;
-    private NPCManager npcManager;
     private TimeManager timeManager;
 
     @Override
@@ -85,7 +82,6 @@ public class LobbyPlugin extends JavaPlugin {
             guiManager = new GUIManager(this, lobbyConfig, corePlugin);
             cosmeticsManager = new CosmeticsManager(this, lobbyConfig);
             itemToggleManager = new ItemToggleManager();
-            npcManager = new NPCManager(this);
             timeManager = new TimeManager(this, lobbyConfig);
 
             // Set the item giver callback for when items are re-enabled
@@ -111,17 +107,12 @@ public class LobbyPlugin extends JavaPlugin {
                     new NetherStarClickListener(guiManager),
                     this
             );
-            getServer().getPluginManager().registerEvents(
-                    new NPCInteractListener(npcManager),
-                    this
-            );
             getServer().getPluginManager().registerEvents(guiManager, this);
             getLogger().info("Event listeners registered");
 
             // 6. Register commands
             getCommand("lobby").setExecutor(new LobbyCommand(this, spawnManager));
             getCommand("spawn").setExecutor(new SpawnCommand(this, spawnManager));
-            getCommand("npc").setExecutor(new com.yourserver.lobby.command.NPCCommand(this, npcManager));
             getLogger().info("Commands registered");
 
             // 7. Start update tasks
@@ -162,11 +153,6 @@ public class LobbyPlugin extends JavaPlugin {
         if (itemToggleManager != null) {
             itemToggleManager.shutdown();
             getLogger().info("Item toggle manager shut down");
-        }
-
-        if (npcManager != null) {
-            npcManager.removeAllNPCs();
-            getLogger().info("NPC manager shut down");
         }
 
         if (timeManager != null) {
@@ -267,10 +253,6 @@ public class LobbyPlugin extends JavaPlugin {
 
     public ItemToggleManager getItemToggleManager() {
         return itemToggleManager;
-    }
-
-    public NPCManager getNpcManager() {
-        return npcManager;
     }
 
     public TimeManager getTimeManager() {

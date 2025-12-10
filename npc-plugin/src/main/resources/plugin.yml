@@ -1,0 +1,28 @@
+name: NPCPlugin
+version: '${version}'
+main: com.yourserver.npc.NPCPlugin
+api-version: '1.21'
+author: MCBZH
+description: Real player NPCs with skins using ProtocolLib
+
+# Requires ProtocolLib
+depend:
+  - ProtocolLib
+
+# Soft dependencies (optional integrations)
+softdepend:
+  - LobbyPlugin
+
+# Load order
+load: POSTWORLD
+
+commands:
+  npc:
+    description: Manage NPCs
+    usage: /<command> <create|remove|list|action|hologram|teleporthere>
+    permission: npc.admin
+
+permissions:
+  npc.admin:
+    description: Manage NPCs
+    default: op

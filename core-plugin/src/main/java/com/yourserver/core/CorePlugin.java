@@ -1,5 +1,6 @@
 package com.yourserver.core;
 
+import com.yourserver.core.buildmode.BuildModeManager;
 import com.yourserver.core.config.DatabaseConfig;
 import com.yourserver.core.database.DatabaseManager;
 import com.yourserver.core.database.MySQLPlayerDataRepository;
@@ -23,6 +24,7 @@ public class CorePlugin extends JavaPlugin {
     private RedisManager redisManager;
     private PlayerDataManager playerDataManager;
     private DatabaseConfig databaseConfig;
+    private BuildModeManager buildModeManager;
 
     @Override
     public void onLoad() {
@@ -59,10 +61,15 @@ public class CorePlugin extends JavaPlugin {
             // 5. Initialize player data manager
             playerDataManager = new PlayerDataManager(playerDataRepo, playerStatsRepo);
             getLogger().info("Player data manager initialized");
+            buildModeManager = new BuildModeManager();
 
             // 6. Register listeners
             getServer().getPluginManager().registerEvents(
                     new com.yourserver.core.listener.PlayerConnectionListener(playerDataManager),
+                    this
+            );
+            getServer().getPluginManager().registerEvents(
+                    new com.yourserver.core.listener.BuildModeListener(buildModeManager),
                     this
             );
             getLogger().info("Event listeners registered");
@@ -70,6 +77,7 @@ public class CorePlugin extends JavaPlugin {
             // 7. Register commands
             getCommand("core").setExecutor(new com.yourserver.core.command.CoreCommand(this));
 
+            getCommand("build").setExecutor(new com.yourserver.core.command.BuildModeCommand(this, buildModeManager));
             getLogger().info("CorePlugin enabled successfully!");
 
         } catch (Exception e) {
@@ -96,6 +104,11 @@ public class CorePlugin extends JavaPlugin {
         if (databaseManager != null) {
             databaseManager.shutdown();
             getLogger().info("Database connection closed");
+        }
+
+        if (buildModeManager != null) {
+            buildModeManager.shutdown();
+            getLogger().info("Build mode manager shut down");
         }
 
         getLogger().info("CorePlugin disabled successfully!");
@@ -126,4 +139,9 @@ public class CorePlugin extends JavaPlugin {
     public DatabaseConfig getDatabaseConfig() {
         return databaseConfig;
     }
+
+    public BuildModeManager getBuildModeManager() {
+        return buildModeManager;
+    }
+
 }

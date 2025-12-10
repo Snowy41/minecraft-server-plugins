@@ -127,6 +127,7 @@ public class PartitionManager {
 
     /**
      * Unloads a partition (saves worlds, unloads plugins).
+     * CRITICAL FIX: Check if players are actually in THIS partition before moving them!
      */
     public boolean unloadPartition(@NotNull String partitionId) {
         Partition partition = partitions.get(partitionId);
@@ -137,50 +138,87 @@ public class PartitionManager {
 
         plugin.getLogger().info("Unloading partition: " + partitionId);
 
-        // Move all players out of this partition (MUST BE SYNC!)
+        // CRITICAL FIX: Only get players who are ACTUALLY in this partition!
         List<Player> playersInPartition = getPlayersInPartition(partitionId);
+
+        plugin.getLogger().info("Found " + playersInPartition.size() +
+                " players in partition '" + partitionId + "'");
+
+        // Only move players if there are any AND we can find a default partition
         if (!playersInPartition.isEmpty()) {
-            plugin.getLogger().info("Moving " + playersInPartition.size() + " players out of partition");
+            plugin.getLogger().info("Moving " + playersInPartition.size() +
+                    " players out of partition");
 
             // Find a default partition to move them to
             Partition defaultPartition = getDefaultPartition(partitionId);
 
-            if (defaultPartition != null) {
-                // MUST teleport synchronously on main thread!
-                for (Player player : playersInPartition) {
-                    // Schedule sync teleport
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        movePlayerToPartition(player, defaultPartition.getId());
-                    });
-                }
+            if (defaultPartition == null) {
+                plugin.getLogger().severe("No default partition found! Cannot move players!");
+                plugin.getLogger().severe("Create a 'lobby' partition before restarting others!");
+                return false;
+            }
 
-                // Wait a bit for teleports to complete
-                try {
-                    Thread.sleep(500);
-                } catch (InterruptedException e) {
-                    Thread.currentThread().interrupt();
+            plugin.getLogger().info("Moving players to: " + defaultPartition.getId());
+
+            // CRITICAL: Check if we're on the main thread
+            boolean isMainThread = Bukkit.isPrimaryThread();
+
+            if (isMainThread) {
+                // Already on main thread - teleport directly
+                for (Player player : playersInPartition) {
+                    plugin.getLogger().info("  - Moving " + player.getName() +
+                            " to " + defaultPartition.getId());
+                    movePlayerToPartition(player, defaultPartition.getId());
                 }
             } else {
-                // No default partition, kick players (also must be sync)
-                for (Player player : playersInPartition) {
-                    Bukkit.getScheduler().runTask(plugin, () -> {
-                        player.kick(plugin.getMiniMessage().deserialize(
-                                "<red>The partition you were in has been unloaded!"
-                        ));
-                    });
+                // Not on main thread - schedule sync task
+                // Use a CountDownLatch to wait for completion
+                final java.util.concurrent.CountDownLatch latch =
+                        new java.util.concurrent.CountDownLatch(1);
+
+                Bukkit.getScheduler().runTask(plugin, () -> {
+                    try {
+                        for (Player player : playersInPartition) {
+                            plugin.getLogger().info("  - Moving " + player.getName() +
+                                    " to " + defaultPartition.getId());
+                            movePlayerToPartition(player, defaultPartition.getId());
+                        }
+                    } finally {
+                        latch.countDown();
+                    }
+                });
+
+                // Wait for teleports to complete (max 5 seconds)
+                try {
+                    if (!latch.await(5, java.util.concurrent.TimeUnit.SECONDS)) {
+                        plugin.getLogger().warning("Timeout waiting for player teleports!");
+                    }
+                } catch (InterruptedException e) {
+                    Thread.currentThread().interrupt();
+                    plugin.getLogger().warning("Interrupted while waiting for teleports!");
                 }
             }
+
+            // Small delay to ensure teleports are processed
+            try {
+                Thread.sleep(500);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        } else {
+            plugin.getLogger().info("No players in partition '" + partitionId +
+                    "' - skipping player movement");
         }
 
         // Unload plugins
         plugin.getPluginHotLoader().unloadPluginsForPartition(partition);
 
-        // Remove world mappings (existing code stays)
+        // Remove world mappings
         for (String worldName : partition.getWorlds()) {
             worldPartitions.remove(worldName);
         }
 
-        // Remove partition (existing code stays)
+        // Remove partition
         partitions.remove(partitionId);
         plugin.getLogger().info("Partition unloaded: " + partitionId);
 
@@ -190,17 +228,29 @@ public class PartitionManager {
     /**
      * Restarts a partition (unload then load).
      * MUST be called synchronously on main thread!
+     * FIXED: Proper thread handling and player detection
      */
     public boolean restartPartition(@NotNull String partitionId) {
-        plugin.getLogger().info("Restarting partition: " + partitionId);
+        plugin.getLogger().info("========================================");
+        plugin.getLogger().info("RESTARTING PARTITION: " + partitionId);
+        plugin.getLogger().info("========================================");
 
         if (!partitions.containsKey(partitionId)) {
             plugin.getLogger().warning("Cannot restart partition that isn't loaded: " + partitionId);
             return false;
         }
 
+        // CRITICAL: Must be on main thread
+        if (!Bukkit.isPrimaryThread()) {
+            plugin.getLogger().severe("restartPartition() called from async thread! This will fail!");
+            plugin.getLogger().severe("Stack trace:");
+            Thread.dumpStack();
+            return false;
+        }
+
         // Unload
         if (!unloadPartition(partitionId)) {
+            plugin.getLogger().severe("Failed to unload partition: " + partitionId);
             return false;
         }
 
@@ -212,7 +262,19 @@ public class PartitionManager {
         }
 
         // Load
-        return loadPartition(partitionId);
+        boolean success = loadPartition(partitionId);
+
+        if (success) {
+            plugin.getLogger().info("========================================");
+            plugin.getLogger().info("✓ PARTITION RESTART COMPLETE: " + partitionId);
+            plugin.getLogger().info("========================================");
+        } else {
+            plugin.getLogger().severe("========================================");
+            plugin.getLogger().severe("✗ PARTITION RESTART FAILED: " + partitionId);
+            plugin.getLogger().severe("========================================");
+        }
+
+        return success;
     }
 
     /**
@@ -245,18 +307,31 @@ public class PartitionManager {
     }
 
     /**
-     * Gets all players in a partition.
+     * DIAGNOSTIC: Gets all players in a partition with detailed logging.
      */
     @NotNull
     public List<Player> getPlayersInPartition(@NotNull String partitionId) {
         List<Player> players = new ArrayList<>();
 
+        plugin.getLogger().fine("=== Checking players for partition: " + partitionId + " ===");
+
         for (Player player : Bukkit.getOnlinePlayers()) {
+            String playerWorld = player.getWorld().getName();
             String playerPartition = getPartitionForPlayer(player);
+
+            plugin.getLogger().fine("  Player: " + player.getName());
+            plugin.getLogger().fine("    World: " + playerWorld);
+            plugin.getLogger().fine("    Partition: " + playerPartition);
+            plugin.getLogger().fine("    Match: " + partitionId.equals(playerPartition));
+
             if (partitionId.equals(playerPartition)) {
                 players.add(player);
+                plugin.getLogger().info("  ✓ " + player.getName() +
+                        " is in partition '" + partitionId + "' (world: " + playerWorld + ")");
             }
         }
+
+        plugin.getLogger().fine("=== Found " + players.size() + " players ===");
 
         return players;
     }

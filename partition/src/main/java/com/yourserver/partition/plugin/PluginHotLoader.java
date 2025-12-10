@@ -137,6 +137,9 @@ public class PluginHotLoader {
         Partition partition = partitionPlugin.getPartitionManager().getPartition(partitionId);
         if (partition == null) {
             partitionPlugin.getLogger().severe("Cannot restart unknown partition: " + partitionId);
+            requester.sendMessage(partitionPlugin.getMiniMessage().deserialize(
+                    "<red>✗ Partition not found: " + partitionId
+            ));
             return;
         }
 
@@ -144,47 +147,74 @@ public class PluginHotLoader {
         partitionPlugin.getLogger().info("PARTITION RESTART: " + partition.getName());
         partitionPlugin.getLogger().info("========================================");
 
-        // Step 1: Get all players in partition
+        // Step 1: Get ONLY players actually in THIS partition
         List<Player> playersInPartition = partitionPlugin.getPartitionManager()
                 .getPlayersInPartition(partitionId);
 
         partitionPlugin.getLogger().info("Step 1: Found " + playersInPartition.size() +
-                " players in partition");
+                " players in partition '" + partitionId + "'");
 
-        // Step 2: Save player positions and move to lobby
-        Partition lobbyPartition = findLobbyPartition();
-        if (lobbyPartition == null) {
-            partitionPlugin.getLogger().severe("No lobby partition found! Cannot restart.");
-            requester.sendMessage(net.kyori.adventure.text.Component.text(
-                    "✗ No lobby partition found! Create a 'lobby' partition first.",
-                    net.kyori.adventure.text.format.NamedTextColor.RED
-            ));
-            return;
+        // Debug: Show all online players and their partitions
+        partitionPlugin.getLogger().info("=== All Online Players ===");
+        for (Player p : Bukkit.getOnlinePlayers()) {
+            String pWorld = p.getWorld().getName();
+            String pPartition = partitionPlugin.getPartitionManager().getPartitionForPlayer(p);
+            partitionPlugin.getLogger().info("  - " + p.getName() +
+                    ": world=" + pWorld + ", partition=" + pPartition);
+        }
+        partitionPlugin.getLogger().info("=========================");
+
+        // Step 2: Only move players if there are any
+        if (playersInPartition.isEmpty()) {
+            partitionPlugin.getLogger().info("Step 2: No players in partition - skipping movement");
+        } else {
+            // Find lobby partition
+            Partition lobbyPartition = findLobbyPartition();
+            if (lobbyPartition == null) {
+                partitionPlugin.getLogger().severe("No lobby partition found! Cannot restart.");
+                requester.sendMessage(partitionPlugin.getMiniMessage().deserialize(
+                        "<red>✗ No lobby partition found! Create a 'lobby' partition first."
+                ));
+                return;
+            }
+
+            // Don't move to the same partition we're restarting!
+            if (lobbyPartition.getId().equals(partitionId)) {
+                partitionPlugin.getLogger().severe("Lobby partition is the same as restart target!");
+                partitionPlugin.getLogger().severe("Cannot move players to partition being restarted!");
+                requester.sendMessage(partitionPlugin.getMiniMessage().deserialize(
+                        "<red>✗ Cannot restart lobby partition - no safe zone available!"
+                ));
+                return;
+            }
+
+            partitionPlugin.getLogger().info("Step 2: Moving " + playersInPartition.size() +
+                    " players to lobby partition: " + lobbyPartition.getId());
+
+            for (Player player : playersInPartition) {
+                // Track for return
+                pendingReturns.put(player.getUniqueId(),
+                        new PendingReturn(partitionId, partition.getName()));
+
+                partitionPlugin.getLogger().info("  → Moving " + player.getName() +
+                        " from " + partitionId + " to " + lobbyPartition.getId());
+
+                // Move to lobby
+                partitionPlugin.getPartitionManager().movePlayerToPartition(
+                        player, lobbyPartition.getId());
+
+                // Send message
+                player.sendMessage(partitionPlugin.getMiniMessage().deserialize(
+                        "<yellow>⚠ Partition <gold>" + partition.getName() +
+                                "</gold> is restarting..."
+                ));
+                player.sendMessage(partitionPlugin.getMiniMessage().deserialize(
+                        "<gray>You'll be able to return in a moment."
+                ));
+            }
         }
 
-        partitionPlugin.getLogger().info("Step 2: Moving players to lobby partition: " +
-                lobbyPartition.getId());
-
-        for (Player player : playersInPartition) {
-            // Track for return
-            pendingReturns.put(player.getUniqueId(),
-                    new PendingReturn(partitionId, partition.getName()));
-
-            // Move to lobby
-            partitionPlugin.getPartitionManager().movePlayerToPartition(
-                    player, lobbyPartition.getId());
-
-            // Send message
-            player.sendMessage(partitionPlugin.getMiniMessage().deserialize(
-                    "<yellow>⚠ Partition <gold>" + partition.getName() +
-                            "</gold> is restarting..."
-            ));
-            player.sendMessage(partitionPlugin.getMiniMessage().deserialize(
-                    "<gray>You'll be able to return in a moment."
-            ));
-        }
-
-        // Step 3: Hot-reload plugins (async to not block)
+        // Step 3: Hot-reload plugins (EXCLUDING PartitionPlugin itself!)
         Bukkit.getScheduler().runTaskAsynchronously(partitionPlugin, () -> {
             try {
                 partitionPlugin.getLogger().info("Step 3: Hot-reloading plugins...");
@@ -192,9 +222,24 @@ public class PluginHotLoader {
                 // Get plugins that need reloading
                 List<String> pluginsToReload = partition.getPlugins();
 
+                // CRITICAL: Filter out infrastructure plugins that should NEVER be reloaded
+                List<String> excludedPlugins = List.of(
+                        "PartitionPlugin",  // Never reload ourselves!
+                        "CorePlugin"        // Core should stay stable
+                );
+
                 for (String pluginName : pluginsToReload) {
+                    // Skip excluded plugins
+                    if (excludedPlugins.contains(pluginName)) {
+                        partitionPlugin.getLogger().info("  ⊗ Skipping infrastructure plugin: " + pluginName);
+                        continue;
+                    }
+
                     Plugin plugin = Bukkit.getPluginManager().getPlugin(pluginName);
-                    if (plugin == null) continue;
+                    if (plugin == null) {
+                        partitionPlugin.getLogger().warning("  ✗ Plugin not found: " + pluginName);
+                        continue;
+                    }
 
                     partitionPlugin.getLogger().info("  ↻ Hot-reloading: " + pluginName);
 
@@ -326,17 +371,39 @@ public class PluginHotLoader {
      * Finds the lobby partition (for temporary player storage).
      */
     private Partition findLobbyPartition() {
-        // Look for partition with ID "lobby" or "hub"
+        // Priority 1: Look for partition explicitly named "lobby"
         Partition lobby = partitionPlugin.getPartitionManager().getPartition("lobby");
-        if (lobby != null) return lobby;
+        if (lobby != null) {
+            partitionPlugin.getLogger().info("Using 'lobby' partition for player movement");
+            return lobby;
+        }
 
+        // Priority 2: Look for "hub"
         lobby = partitionPlugin.getPartitionManager().getPartition("hub");
-        if (lobby != null) return lobby;
+        if (lobby != null) {
+            partitionPlugin.getLogger().info("Using 'hub' partition for player movement");
+            return lobby;
+        }
 
-        // Otherwise, return first partition that isn't being restarted
-        return partitionPlugin.getPartitionManager().getAllPartitions().stream()
+        // Priority 3: Use "build" if it exists (common setup)
+        lobby = partitionPlugin.getPartitionManager().getPartition("build");
+        if (lobby != null) {
+            partitionPlugin.getLogger().warning("No 'lobby' partition found - using 'build' as fallback");
+            partitionPlugin.getLogger().warning("Consider creating a dedicated lobby partition!");
+            return lobby;
+        }
+
+        // Priority 4: Use first available partition (last resort)
+        lobby = partitionPlugin.getPartitionManager().getAllPartitions().stream()
                 .findFirst()
                 .orElse(null);
+
+        if (lobby != null) {
+            partitionPlugin.getLogger().warning("No lobby/hub/build found - using '" +
+                    lobby.getId() + "' as emergency fallback");
+        }
+
+        return lobby;
     }
 
     /**

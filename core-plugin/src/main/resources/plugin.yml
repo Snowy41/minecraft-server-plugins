@@ -23,6 +23,12 @@ commands:
     permission: core.admin
     aliases: [coreplugin]
 
+  build:
+    description: Activate build mode (creative + tools)
+    usage: /<command>
+    permission: core.build
+    aliases: [builder, bm]
+
 permissions:
   core.admin:
     description: Access to core plugin administration
@@ -33,3 +39,8 @@ permissions:
   core.debug:
     description: View debug information
     default: op
+  core.build:
+    description: Use build mode command
+    default: op
+    children:
+      core.build.use: true

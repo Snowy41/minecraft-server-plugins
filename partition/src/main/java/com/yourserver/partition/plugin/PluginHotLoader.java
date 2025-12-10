@@ -7,16 +7,12 @@ import org.bukkit.command.Command;
 import org.bukkit.command.PluginCommand;
 import org.bukkit.command.SimpleCommandMap;
 import org.bukkit.entity.Player;
-import org.bukkit.event.Event;
 import org.bukkit.event.HandlerList;
 import org.bukkit.plugin.Plugin;
 import org.bukkit.plugin.PluginManager;
 import org.jetbrains.annotations.NotNull;
 
-import java.io.File;
 import java.lang.reflect.Field;
-import java.net.URL;
-import java.net.URLClassLoader;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.logging.Level;
@@ -371,9 +367,6 @@ public class PluginHotLoader {
                 return false;
             });
 
-            // Sync commands with clients (Paper API)
-            // Note: syncCommands() was removed in Paper 1.20.5+
-            // Commands auto-sync on player join, no manual sync needed
             partitionPlugin.getLogger().fine("Unregistered commands for: " + plugin.getName());
 
         } catch (Exception e) {

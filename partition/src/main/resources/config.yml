@@ -1,84 +1,72 @@
 # Partition Plugin Configuration
-# Version: 1.0.0
-#
-# This plugin splits your server into multiple isolated "mini-servers"
-# Each partition can have its own worlds and plugins, running independently.
+# Tailored for your server with FastAsyncWorldEdit, FastAsyncVoxelSniper, etc.
 
 # ===== ISOLATION SETTINGS =====
-# Controls how players in different partitions interact
 isolation:
-  # Should players only see chat from their partition?
   chat: true
-
-  # Should tab list only show players in the same partition?
   tablist: true
-
-  # Should commands be partition-specific? (Experimental)
   commands: false
-
-  # Should world borders be enforced per-partition?
   world-border: true
 
 # ===== PARTITIONS =====
-# Define your server partitions here
-
 partitions:
   # ===== BUILD SERVER =====
-  # Main build world with all necessary plugins
+  # Full building environment with both async plugins
   build:
     name: "Build Server"
     description: "Main building environment with all tools"
     enabled: true
 
-    # Worlds assigned to this partition
+    # Your existing build worlds
     worlds:
-      - "world"           # Main build world (Minecraft overworld)
-      - "world_nether"    # Nether for build server
-      - "world_the_end"   # End for build server
+      - "world"
+      - "world_nether"
+      - "world_the_end"
 
-    # Plugins active in this partition
-    # Based on your screenshot - EXACT plugin names from /plugins command
+    # Plugins for builders - EXACT names from /plugins command
     plugins:
-      - "CorePlugin"                    # Core infrastructure (always needed)
-      - "LobbyPlugin"                   # Lobby system
+      - "CorePlugin"                    # Your core infrastructure
+      - "LobbyPlugin"                   # Your lobby system
       - "PartitionPlugin"               # This plugin itself
-      - "FastAsyncWorldEdit"            # World editing plugin
+      - "FastAsyncWorldEdit"            # From FastAsyncWorldEdit-Paper-2.14.3-SNAPSHOT-1231.jar
+      - "fastasyncvoxelsniper"          # From fastasyncvoxelsniper-3.2.3.jar
+      # ↑ IMPORTANT: Use EXACT names from /plugins command!
+      #    Run /plugins in-game to verify these names
 
-    # Spawn location for this partition
+    # Spawn location (from your lobby-plugin config)
     spawn-world: "world"
     spawn-location:
-      x: -174.5   # Center of your lobby spawn region
+      x: -174.5
       y: -45.0
       z: -13.5
       yaw: 0.0
       pitch: 0.0
 
-    # Auto-load on server start?
     auto-load: true
-
-    # Persist data when partition restarts?
     persistent: true
 
   # ===== DEV SERVER =====
-  # Testing environment with minimal plugins
+  # Testing environment - MINIMAL plugins
   dev:
-    name: "Development Server"
-    description: "Testing environment for new features"
+    name: "Dev Server"
+    description: "Testing environment for plugin updates"
     enabled: true
 
-    # Dev server worlds (you'll need to create these)
+    # Dev worlds (will be auto-created if missing)
     worlds:
       - "dev_world"
       - "dev_world_nether"
       - "dev_world_the_end"
 
-    # Minimal plugin set for dev testing
+    # Minimal plugin set for dev
     plugins:
-      - "CorePlugin"       # Core infrastructure
-      - "LobbyPlugin"      # Lobby system
-      - "PartitionPlugin"  # This plugin itself
+      - "CorePlugin"                    # Always needed
+      - "LobbyPlugin"                   # Always needed
+      - "PartitionPlugin"               # Always needed
+      # ↑ NO building plugins here by default!
+      #   This is where you test NEW plugins before enabling in build
 
-    # Spawn location (adjust as needed when you create dev_world)
+    # Dev spawn (will use default coords when world is created)
     spawn-world: "dev_world"
     spawn-location:
       x: 0.5
@@ -90,112 +78,121 @@ partitions:
     auto-load: true
     persistent: true
 
-# ===== CREATING DEV WORLDS =====
-#
-# GOOD NEWS: The plugin will automatically create missing worlds!
-#
-# When you load the dev partition, the plugin will:
-# 1. Check if dev_world exists
-# 2. If not, create it automatically
-# 3. Same for dev_world_nether and dev_world_the_end
-#
-# The worlds will be generated with default Minecraft generation.
-# No manual setup required!
-#
-# If you want to copy your existing world instead:
-#   1. Stop server
-#   2. Copy "world" folder → "dev_world"
-#   3. Start server
-#   The plugin will detect and load the existing world.
+  # ===== LOBBY (REQUIRED) =====
+  # Safe zone for players during partition restarts
+  lobby:
+    name: "Lobby"
+    description: "Main lobby - safe zone for restarts"
+    enabled: true
 
-# ===== HOT-RELOADING PARTITIONS =====
-#
-# This is the KILLER FEATURE of this plugin!
-#
-# You can reload the dev partition WITHOUT affecting builders:
-#   /partition restart dev
-#
-# What happens:
-# 1. Players in dev partition are temporarily moved to build partition
-# 2. Dev plugins are reloaded (onDisable → onEnable)
-# 3. Players are moved back to their exact locations
-# 4. Build partition continues running normally - ZERO interruption!
-#
-# This means:
-# - Update plugins on dev server while builders keep building
-# - Test new features without restarting entire server
-# - True multi-server experience in one Minecraft instance
-#
-# Example workflow:
-# 1. Build your plugin: ./gradlew :lobby-plugin:shadowJar
-# 2. Copy new jar to plugins/ folder
-# 3. Run: /partition restart dev
-# 4. New plugin version loads ONLY in dev partition!
-# 5. Builders in build partition never even notice!
+    worlds:
+      - "world"  # Can reuse main world as lobby
 
-# ===== NOTES =====
-#
-# 1. PLUGIN NAME MATCHING
-#    - Plugin names must match what shows in /plugins command
-#    - NOT the .jar filename!
-#    - Example: "fastasyncvoxelsniper-3.2.3.jar" → check /plugins for actual name
-#    - Current plugins (from your screenshot):
-#      • CorePlugin
-#      • FastAsyncWorldEdit
-#      • LobbyPlugin
-#      • PartitionPlugin
-#
-# 2. AUTOMATIC WORLD CREATION
-#    - Missing worlds are created automatically on partition load
-#    - No manual world setup required!
-#    - Worlds are generated with default Minecraft settings
-#    - To use custom worlds, create them before starting server
-#
-# 3. HOT-RELOADING
-#    - Use /partition restart <partition> to reload a partition
-#    - Other partitions continue running normally
-#    - Players are safely moved during reload
-#    - Perfect for testing plugin updates without full server restart
-#
-# 4. WORLD MANAGEMENT
-#    - Worlds must exist before assigning to partitions
-#    - World names are case-sensitive
-#    - Each world can only belong to ONE partition
-#
-# 3. TELEPORTING BETWEEN PARTITIONS
-#    - /partition tp build - Go to build server
-#    - /partition tp dev - Go to dev server
-#    - Players will teleport to the spawn location
-#
-# 4. VIEWING PARTITION INFO
-#    - /partition list - See all partitions
-#    - /partition info build - Details about build partition
-#    - /partition worlds - See which world belongs to which partition
-#    - /partition plugins build - See plugins in build partition
-#
-# 5. RESTARTING PARTITIONS
-#    - /partition restart build - Reload build partition
-#    - Players in that partition will be briefly moved out
-#    - Useful for testing plugin changes
-#
-# 6. TROUBLESHOOTING
-#    - If a world doesn't exist, partition won't load
-#    - Check server console for errors on startup
-#    - Use /partition info <partition> to verify everything loaded
-#    - Plugin names must match exactly (check /plugins)
+    plugins:
+      - "CorePlugin"
+      - "LobbyPlugin"
+      - "PartitionPlugin"
 
-# ===== USEFUL COMMANDS =====
+    spawn-world: "world"
+    spawn-location:
+      x: -174.5  # Your lobby spawn
+      y: -45.0
+      z: -13.5
+      yaw: 0.0
+      pitch: 0.0
+
+    auto-load: true
+    persistent: true
+
+# ===== USAGE EXAMPLES =====
 #
-# After server starts, verify configuration:
-#   /partition list          - Should show 2 partitions
-#   /partition info build    - Check build partition loaded correctly
-#   /partition info dev      - Check dev partition loaded correctly
-#   /partition worlds        - Verify world mappings
+# Example 1: Testing WorldEdit update in dev
+# ----------------------------------------
+# 1. Add WorldEdit to dev partition:
 #
-# Test partition switching:
-#   /partition tp build      - Go to build server
-#   /partition tp dev        - Go to dev server
+#    dev:
+#      plugins:
+#        - "CorePlugin"
+#        - "LobbyPlugin"
+#        - "PartitionPlugin"
+#        - "FastAsyncWorldEdit"  # ← Add this
 #
-# Manage plugins:
-#   /partition plugins build - List plugins in build
-#   /partition plugins dev   - List plugins in dev
+# 2. Reload config: /partition reload
+# 3. Restart dev: /partition restart dev
+# 4. WorldEdit now loads ONLY in dev!
+# 5. Builders in build partition: unaffected
+#
+# Example 2: Testing your own plugin
+# ----------------------------------
+# 1. Build your plugin: ./gradlew :your-plugin:shadowJar
+# 2. Copy JAR to plugins/ folder
+# 3. Add to dev config:
+#
+#    dev:
+#      plugins:
+#        - "CorePlugin"
+#        - "LobbyPlugin"
+#        - "PartitionPlugin"
+#        - "YourPlugin"  # ← Your new plugin
+#
+# 4. Reload config: /partition reload
+# 5. Restart dev: /partition restart dev
+# 6. Test your plugin in dev world
+# 7. Builders keep working in build world!
+#
+# Example 3: Deploying stable plugin to build
+# -------------------------------------------
+# 1. After testing in dev, add to build:
+#
+#    build:
+#      plugins:
+#        - "CorePlugin"
+#        - "LobbyPlugin"
+#        - "PartitionPlugin"
+#        - "FastAsyncWorldEdit"
+#        - "fastasyncvoxelsniper"
+#        - "YourPlugin"  # ← Now in production!
+#
+# 2. Schedule a restart window
+# 3. Restart build: /partition restart build
+# 4. Plugin now live for builders
+
+# ===== IMPORTANT NOTES =====
+#
+# 1. PLUGIN NAMES MUST MATCH /plugins OUTPUT
+#    Run this in-game: /plugins
+#    You should see: CorePlugin, LobbyPlugin, PartitionPlugin,
+#                    FastAsyncWorldEdit, fastasyncvoxelsniper
+#    ↑ Use these EXACT names (case-sensitive!)
+#
+# 2. LOBBY PARTITION IS REQUIRED
+#    The system needs a safe place to move players during restarts.
+#    If you don't have a lobby partition, restarts will fail!
+#
+# 3. WORLD AUTO-CREATION
+#    Missing worlds (like dev_world) are created automatically.
+#    No manual setup needed!
+#
+# 4. HOT-RELOAD WORKFLOW
+#    Build partition = Stable, rarely restarted
+#    Dev partition = Testing ground, restarted often
+#    Lobby partition = Safe zone, never restarted
+#
+# 5. ZERO DOWNTIME
+#    /partition restart dev → Only dev partition restarts
+#    Build partition → Continues running normally
+#    Builders → Never interrupted!
+
+# ===== COMMANDS REFERENCE =====
+#
+# /partition list              - View all partitions
+# /partition info build        - Details about build partition
+# /partition info dev          - Details about dev partition
+# /partition tp build          - Go to build server
+# /partition tp dev            - Go to dev server
+# /partition restart dev       - Hot-reload dev partition
+# /partition return            - Return after restart
+# /partition worlds            - View world mappings
+# /partition plugins build     - View plugins in build
+# /partition plugins dev       - View plugins in dev
+# /partition reload            - Reload this config

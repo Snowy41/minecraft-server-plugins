@@ -30,13 +30,13 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
 
     private final PartitionPlugin plugin;
     private final PartitionManager partitionManager;
-    private final PartitionIsolationSystem isolationSystem; // ADD THIS FIELD
+    private final PartitionIsolationSystem isolationSystem;
     private final PluginHotLoader pluginHotLoader;
 
     public PartitionCommand(PartitionPlugin plugin,
                             PartitionManager partitionManager,
                             PartitionIsolationSystem isolationSystem,
-                            PluginHotLoader pluginHotLoader) { // ← ADD PARAMETER
+                            PluginHotLoader pluginHotLoader) {
         this.plugin = plugin;
         this.partitionManager = partitionManager;
         this.isolationSystem = isolationSystem;
@@ -57,8 +57,8 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
             case "list" -> handleList(sender);
             case "info" -> handleInfo(sender, args);
             case "tp", "teleport" -> handleTeleport(sender, args);
-            case "restart" -> handleRestartWithHotReload(sender, args);  // ← CHANGED!
-            case "return" -> handleReturn(sender);                        // ← NEW!
+            case "restart" -> handleRestartWithHotReload(sender, args);
+            case "return" -> handleReturn(sender);
             case "reload" -> handleReload(sender);
             case "worlds" -> handleWorlds(sender);
             case "plugins" -> handlePlugins(sender, args);
@@ -529,7 +529,7 @@ public class PartitionCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String label, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("list", "info", "tp", "restart", "return", // ← ADD "return"
+            return Arrays.asList("list", "info", "tp", "restart", "return",
                     "reload", "worlds", "plugins");
         }
 

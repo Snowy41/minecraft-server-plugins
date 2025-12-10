@@ -11,3 +11,4 @@ include(
 
 // Map the partition folder to PartitionPlugin module
 project(":partition").name = "PartitionPlugin"
+include("npc-plugin")

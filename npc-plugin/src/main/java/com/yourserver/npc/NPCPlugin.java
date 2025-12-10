@@ -1,0 +1,142 @@
+package com.yourserver.npc;
+
+import com.comphenix.protocol.ProtocolLibrary;
+import com.comphenix.protocol.ProtocolManager;
+import com.yourserver.npc.api.NPCAPI;
+import com.yourserver.npc.command.NPCCommand;
+import com.yourserver.npc.listener.NPCInteractListener;
+import com.yourserver.npc.listener.PlayerJoinListener;
+import com.yourserver.npc.manager.NPCManager;
+import com.yourserver.npc.storage.NPCStorage;
+import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.plugin.java.JavaPlugin;
+
+/**
+ * Standalone NPC Plugin - Real player NPCs with skins.
+ *
+ * Features:
+ * - Real player entities (not armor stands!)
+ * - Actual player skins from Mojang API
+ * - Persistent storage (npcs.yml)
+ * - Click actions (GUI, teleport, command, message)
+ * - Hologram text above NPCs
+ * - Public API for other plugins
+ */
+public class NPCPlugin extends JavaPlugin {
+
+    private MiniMessage miniMessage;
+    private NPCStorage storage;
+    private NPCManager npcManager;
+    private ProtocolManager protocolManager;
+    private NPCAPI npcAPI;
+
+    @Override
+    public void onLoad() {
+        getLogger().info("Loading NPCPlugin...");
+
+        // Check for ProtocolLib
+        if (getServer().getPluginManager().getPlugin("ProtocolLib") == null) {
+            getLogger().severe("===========================================");
+            getLogger().severe("  ProtocolLib is REQUIRED for NPCs!");
+            getLogger().severe("  Download: https://ci.dmulloy2.net/job/ProtocolLib/");
+            getLogger().severe("===========================================");
+            throw new RuntimeException("ProtocolLib not found!");
+        }
+    }
+
+    @Override
+    public void onEnable() {
+        getLogger().info("Enabling NPCPlugin...");
+
+        try {
+            // 1. Initialize MiniMessage
+            miniMessage = MiniMessage.miniMessage();
+
+            // 2. Initialize ProtocolLib
+            protocolManager = ProtocolLibrary.getProtocolManager();
+            getLogger().info("✓ ProtocolLib integration enabled");
+
+            // 3. Initialize storage
+            storage = new NPCStorage(this);
+            getLogger().info("✓ Storage initialized");
+
+            // 4. Initialize NPC manager
+            npcManager = new NPCManager(this, storage, protocolManager);
+            getLogger().info("✓ NPC manager initialized");
+
+            // 5. Load all NPCs from storage
+            npcManager.loadAllNPCs();
+
+            // 6. Initialize public API
+            npcAPI = new NPCAPI(npcManager);
+            getLogger().info("✓ Public API available");
+
+            // 7. Register listeners
+            getServer().getPluginManager().registerEvents(
+                    new NPCInteractListener(this, npcManager), this
+            );
+            getServer().getPluginManager().registerEvents(
+                    new PlayerJoinListener(npcManager), this
+            );
+            getLogger().info("✓ Listeners registered");
+
+            // 8. Register commands
+            NPCCommand npcCommand = new NPCCommand(this, npcManager);
+            getCommand("npc").setExecutor(npcCommand);
+            getCommand("npc").setTabCompleter(npcCommand);
+            getLogger().info("✓ Commands registered");
+
+            getLogger().info("NPCPlugin enabled successfully!");
+            getLogger().info("✓ Real player NPCs with skins");
+            getLogger().info("✓ API available for other plugins");
+
+        } catch (Exception e) {
+            getLogger().severe("Failed to enable NPCPlugin!");
+            e.printStackTrace();
+            getServer().getPluginManager().disablePlugin(this);
+        }
+    }
+
+    @Override
+    public void onDisable() {
+        getLogger().info("Disabling NPCPlugin...");
+
+        if (npcManager != null) {
+            npcManager.removeAllNPCs();
+            getLogger().info("✓ All NPCs removed");
+        }
+
+        getLogger().info("NPCPlugin disabled successfully!");
+    }
+
+    // ===== Public API =====
+
+    public MiniMessage getMiniMessage() {
+        return miniMessage;
+    }
+
+    public NPCManager getNPCManager() {
+        return npcManager;
+    }
+
+    public ProtocolManager getProtocolManager() {
+        return protocolManager;
+    }
+
+    /**
+     * Gets the public API for other plugins to use.
+     *
+     * Example usage in another plugin:
+     * ```java
+     * NPCPlugin npcPlugin = (NPCPlugin) Bukkit.getPluginManager().getPlugin("NPCPlugin");
+     * NPCAPI api = npcPlugin.getAPI();
+     *
+     * api.createNPC("my_npc", "Steve", location, player -> {
+     *     player.sendMessage("Hello!");
+     * });
+     * ```
+     */
+    public NPCAPI getAPI() {
+        return npcAPI;
+    }
+}

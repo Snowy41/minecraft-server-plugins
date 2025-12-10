@@ -425,19 +425,30 @@ public class PluginHotLoader {
             @SuppressWarnings("unchecked")
             Map<String, Command> knownCommands = (Map<String, Command>) knownCommandsField.get(commandMap);
 
-            // Remove commands belonging to this plugin
-            knownCommands.entrySet().removeIf(entry -> {
+            // Create a list of keys to remove (avoid ConcurrentModificationException)
+            List<String> toRemove = new ArrayList<>();
+            for (Map.Entry<String, Command> entry : knownCommands.entrySet()) {
                 Command command = entry.getValue();
                 if (command instanceof PluginCommand) {
-                    return ((PluginCommand) command).getPlugin().equals(plugin);
+                    if (((PluginCommand) command).getPlugin().equals(plugin)) {
+                        toRemove.add(entry.getKey());
+                    }
                 }
-                return false;
-            });
+            }
 
-            partitionPlugin.getLogger().fine("Unregistered commands for: " + plugin.getName());
+            // Remove commands
+            for (String key : toRemove) {
+                knownCommands.remove(key);
+            }
 
+            partitionPlugin.getLogger().fine("Unregistered " + toRemove.size() +
+                    " commands for: " + plugin.getName());
+
+        } catch (NoSuchFieldException e) {
+            // Field structure changed in Paper - commands will still work
+            partitionPlugin.getLogger().fine("Command map structure changed - skipping unregister");
         } catch (Exception e) {
-            partitionPlugin.getLogger().warning("Failed to unregister commands: " + e.getMessage());
+            partitionPlugin.getLogger().fine("Command unregister: " + e.getMessage());
         }
     }
 

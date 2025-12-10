@@ -1,5 +1,6 @@
 package com.yourserver.npc.manager;
 
+import com.comphenix.protocol.PacketType;
 import com.comphenix.protocol.ProtocolManager;
 import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.*;
@@ -201,39 +202,52 @@ public class NPCManager {
      */
     private void sendPlayerInfoPacket(@NotNull Player player, @NotNull NPC npc, boolean add) {
         try {
-            PacketContainer packet = protocolManager.createPacket(PLAYER_INFO);
+            if (add) {
+                // ADD player to tab list using PLAYER_INFO_UPDATE (1.19.3+)
+                PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.PLAYER);
 
-            // Create player profile with skin
-            PlayerProfile profile = Bukkit.createProfile(npc.getUuid(), npc.getName());
-            if (npc.hasSkin()) {
-                profile.setProperty(new ProfileProperty(
-                        "textures",
-                        npc.getSkinTexture(),
-                        npc.getSkinSignature()
+                // Create WrappedGameProfile directly
+                WrappedGameProfile gameProfile = new WrappedGameProfile(npc.getUuid(), npc.getName());
+
+                // Add skin properties
+                if (npc.hasSkin()) {
+                    gameProfile.getProperties().put("textures",
+                            new WrappedSignedProperty("textures", npc.getSkinTexture(), npc.getSkinSignature())
+                    );
+                }
+
+                // Set the action - ADD_PLAYER
+                packet.getPlayerInfoActions().write(0, EnumSet.of(
+                        EnumWrappers.PlayerInfoAction.ADD_PLAYER,
+                        EnumWrappers.PlayerInfoAction.UPDATE_LISTED
                 ));
+
+                // Create player info data
+                PlayerInfoData data = new PlayerInfoData(
+                        gameProfile,
+                        0, // Ping
+                        EnumWrappers.NativeGameMode.SURVIVAL,
+                        WrappedChatComponent.fromText(npc.getName()),
+                        null // No remote chat session
+                );
+
+                packet.getPlayerInfoDataLists().write(1, List.of(data));
+
+                protocolManager.sendServerPacket(player, packet);
+
+            } else {
+                // REMOVE player from tab list using PLAYER_INFO_REMOVE (1.19.3+)
+                PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.PLAYER_INFO_REMOVE);
+
+                // Just need the UUID to remove
+                packet.getUUIDLists().write(0, List.of(npc.getUuid()));
+
+                protocolManager.sendServerPacket(player, packet);
             }
-
-            WrappedGameProfile gameProfile = WrappedGameProfile.fromHandle(profile);
-
-            EnumWrappers.PlayerInfoAction action = add ?
-                    EnumWrappers.PlayerInfoAction.ADD_PLAYER :
-                    EnumWrappers.PlayerInfoAction.REMOVE_PLAYER;
-
-            packet.getPlayerInfoActions().write(0, EnumSet.of(action));
-
-            List<PlayerInfoData> data = List.of(new PlayerInfoData(
-                    WrappedGameProfile.fromUUID(npc.getUuid()),
-                    0, // Ping
-                    EnumWrappers.NativeGameMode.SURVIVAL,
-                    WrappedChatComponent.fromText(npc.getName())
-            ));
-
-            packet.getPlayerInfoDataLists().write(1, data);
-
-            protocolManager.sendServerPacket(player, packet);
 
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to send player info packet: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
@@ -242,22 +256,35 @@ public class NPCManager {
      */
     private void sendSpawnPlayerPacket(@NotNull Player player, @NotNull NPC npc) {
         try {
-            PacketContainer packet = protocolManager.createPacket(NAMED_ENTITY_SPAWN);
+            // FIX 2: In 1.21+, use SPAWN_ENTITY instead of NAMED_ENTITY_SPAWN
+            PacketContainer packet = protocolManager.createPacket(SPAWN_ENTITY);
 
             Location loc = npc.getLocation();
 
             packet.getIntegers().write(0, npc.getEntityId()); // Entity ID
             packet.getUUIDs().write(0, npc.getUuid()); // UUID
+
+            // Set entity type to PLAYER (use the correct ID for players)
+            packet.getEntityTypeModifier().write(0, org.bukkit.entity.EntityType.PLAYER);
+
             packet.getDoubles().write(0, loc.getX()); // X
             packet.getDoubles().write(1, loc.getY()); // Y
             packet.getDoubles().write(2, loc.getZ()); // Z
+
+            // Velocity (0, 0, 0)
+            packet.getIntegers().write(1, 0); // Velocity X
+            packet.getIntegers().write(2, 0); // Velocity Y
+            packet.getIntegers().write(3, 0); // Velocity Z
+
             packet.getBytes().write(0, (byte) ((loc.getYaw() * 256.0F) / 360.0F)); // Yaw
             packet.getBytes().write(1, (byte) ((loc.getPitch() * 256.0F) / 360.0F)); // Pitch
+            packet.getBytes().write(2, (byte) ((loc.getYaw() * 256.0F) / 360.0F)); // Head yaw
 
             protocolManager.sendServerPacket(player, packet);
 
         } catch (Exception e) {
             plugin.getLogger().severe("Failed to send spawn packet: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 

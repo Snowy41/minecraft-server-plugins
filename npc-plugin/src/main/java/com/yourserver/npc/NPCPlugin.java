@@ -72,9 +72,9 @@ public class NPCPlugin extends JavaPlugin {
             getLogger().info("✓ Public API available");
 
             // 7. Register listeners
-            getServer().getPluginManager().registerEvents(
-                    new NPCInteractListener(this, npcManager), this
-            );
+            protocolManager.addPacketListener(new NPCInteractListener(this, npcManager));
+            getLogger().info("✓ ProtocolLib packet listener registered");
+
             getServer().getPluginManager().registerEvents(
                     new PlayerJoinListener(npcManager), this
             );

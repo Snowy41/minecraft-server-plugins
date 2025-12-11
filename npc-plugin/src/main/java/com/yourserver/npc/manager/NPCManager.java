@@ -645,6 +645,14 @@ public class NPCManager {
         npc.setHologramEntityIds(hologramIds);
     }
 
+    public void stopLookTracking() {
+        if (lookTrackingTask != null) {
+            lookTrackingTask.cancel();
+            lookTrackingTask = null;
+        }
+        autoLookEnabled.clear();
+    }
+
     /**
      * Sets equipment for an NPC.
      */
@@ -672,7 +680,7 @@ public class NPCManager {
     /**
      * Saves all NPCs to storage.
      */
-    private void saveAllNPCs() {
+    public void saveAllNPCs() {
         storage.saveNPCs(new ArrayList<>(registry.getAllNPCs()));
     }
 

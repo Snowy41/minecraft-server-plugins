@@ -10,8 +10,11 @@ import com.yourserver.npc.listener.NPCInteractListener;
 import com.yourserver.npc.listener.PlayerJoinListener;
 import com.yourserver.npc.manager.NPCManager;
 import com.yourserver.npc.storage.NPCStorage;
+import com.yourserver.npc.util.SkinFetcher;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.scheduler.BukkitTask;
 
 /**
  * Standalone NPC Plugin - Real player NPCs with skins.
@@ -32,6 +35,7 @@ public class NPCPlugin extends JavaPlugin {
     private ProtocolManager protocolManager;
     private NPCAPI npcAPI;
     private NPCEditorManager editorManager;
+    private BukkitTask autoSaveTask;
 
     @Override
     public void onLoad() {
@@ -98,21 +102,49 @@ public class NPCPlugin extends JavaPlugin {
             getLogger().info("✓ Real player NPCs with skins");
             getLogger().info("✓ API available for other plugins");
 
+
         } catch (Exception e) {
             getLogger().severe("Failed to enable NPCPlugin!");
             e.printStackTrace();
             getServer().getPluginManager().disablePlugin(this);
         }
+
+        autoSaveTask = Bukkit.getScheduler().runTaskTimerAsynchronously(
+                this,
+                () -> {
+                    if (npcManager != null) {
+                        npcManager.saveAllNPCs();
+                        getLogger().info("Auto-saved NPCs");
+                    }
+                },
+                6000L, // 5 minutes
+                6000L
+        );
     }
 
     @Override
     public void onDisable() {
         getLogger().info("Disabling NPCPlugin...");
+        if (autoSaveTask != null) {
+            autoSaveTask.cancel();
+        }
 
+        // 1. Stop look tracking task
         if (npcManager != null) {
+            npcManager.stopLookTracking();
             npcManager.removeAllNPCs();
             getLogger().info("✓ All NPCs removed");
         }
+
+        // 2. Clear editor sessions
+        if (editorManager != null) {
+            editorManager.clearAllSessions();
+            getLogger().info("✓ Editor sessions cleared");
+        }
+
+        // 3. Clear skin cache
+        SkinFetcher.clearCache();
+        getLogger().info("✓ Skin cache cleared");
 
         getLogger().info("NPCPlugin disabled successfully!");
     }

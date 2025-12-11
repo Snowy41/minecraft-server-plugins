@@ -1,0 +1,28 @@
+# Skin Fetching
+skin:
+  cache-duration: 3600 # seconds (1 hour)
+  fetch-timeout: 5000 # ms
+  retry-attempts: 3
+
+# Look Tracking
+look:
+  update-interval: 10 # ticks (0.5s)
+  max-distance: 5.0 # blocks
+  auto-enable: false # enable auto-look by default
+
+# Performance
+performance:
+  hologram-max-lines: 5
+  nearby-radius: 50.0 # blocks for spatial queries
+
+# Storage
+storage:
+  save-interval: 300 # seconds (5 minutes)
+  backup-enabled: true
+  backup-count: 3
+
+# Debug
+debug:
+  log-skin-fetching: false
+  log-packet-sending: false
+  log-registry-operations: false

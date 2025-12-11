@@ -97,6 +97,12 @@ public class NPCEditorListener implements Listener {
      */
     @EventHandler
     public void onPlayerQuit(PlayerQuitEvent event) {
-        editorManager.cleanup(event.getPlayer());
+        NPCEditorSession session = editorManager.getSession(event.getPlayer());
+        if (session != null) {
+            // Save changes before cleanup
+            npcManager.updateNPCPose(session.getNPC());
+            editorManager.endSession(event.getPlayer(), true);
+            editorManager.cleanup(event.getPlayer());
+        }
     }
 }

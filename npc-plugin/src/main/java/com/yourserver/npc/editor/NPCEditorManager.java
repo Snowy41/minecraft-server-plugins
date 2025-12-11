@@ -4,11 +4,13 @@ import com.yourserver.npc.NPCPlugin;
 import com.yourserver.npc.model.NPC;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
+import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.Map;
 import java.util.UUID;
 
@@ -61,6 +63,19 @@ public class NPCEditorManager {
         session.sendModeUpdate();
 
         return true;
+    }
+
+    /**
+     * Clears all active sessions (called on plugin disable).
+     */
+    public void clearAllSessions() {
+        for (UUID uuid : new HashSet<>(activeSessions.keySet())) {
+            Player player = Bukkit.getPlayer(uuid);
+            if (player != null) {
+                endSession(player, true);
+            }
+        }
+        activeSessions.clear();
     }
 
     /**

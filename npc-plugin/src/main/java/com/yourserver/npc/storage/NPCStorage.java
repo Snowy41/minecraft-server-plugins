@@ -9,6 +9,9 @@ import org.bukkit.Location;
 import java.io.*;
 import java.util.*;
 
+/**
+ * Enhanced storage with pose persistence.
+ */
 public class NPCStorage {
 
     private final NPCPlugin plugin;
@@ -22,7 +25,15 @@ public class NPCStorage {
 
         if (!file.exists()) {
             file.getParentFile().mkdirs();
-            try { file.createNewFile(); } catch (IOException e) {}
+            try {
+                file.createNewFile();
+                // Write empty array
+                try (FileWriter writer = new FileWriter(file)) {
+                    writer.write("[]");
+                }
+            } catch (IOException e) {
+                plugin.getLogger().severe("Failed to create npcs.json: " + e.getMessage());
+            }
         }
     }
 
@@ -52,14 +63,20 @@ public class NPCStorage {
                     obj.getAsJsonArray("hologram").forEach(e -> hologramLines.add(e.getAsString()));
                 }
 
+                // Load pose (with defaults if missing)
+                NPC.NPCPose pose = obj.has("pose")
+                        ? parsePose(obj.getAsJsonObject("pose"))
+                        : new NPC.NPCPose();
+
                 NPC npc = new NPC(id, name, uuid, entityId, location,
-                        skinTexture, skinSignature, action, hologramLines);
+                        skinTexture, skinSignature, action, hologramLines, pose);
 
                 npcs.add(npc);
             }
 
         } catch (Exception e) {
             plugin.getLogger().warning("Failed to load NPCs: " + e.getMessage());
+            e.printStackTrace();
         }
 
         return npcs;
@@ -86,6 +103,9 @@ public class NPCStorage {
             JsonArray hologram = new JsonArray();
             npc.getHologramLines().forEach(hologram::add);
             obj.add("hologram", hologram);
+
+            // Save pose
+            obj.add("pose", serializePose(npc.getPose()));
 
             array.add(obj);
         }
@@ -129,6 +149,52 @@ public class NPCStorage {
         JsonObject obj = new JsonObject();
         obj.addProperty("type", action.getType().name());
         obj.addProperty("data", action.getData());
+        return obj;
+    }
+
+    private NPC.NPCPose parsePose(JsonObject obj) {
+        return new NPC.NPCPose(
+                obj.get("headPitch").getAsFloat(),
+                obj.get("headYaw").getAsFloat(),
+                obj.get("headRoll").getAsFloat(),
+                obj.get("bodyPitch").getAsFloat(),
+                obj.get("bodyYaw").getAsFloat(),
+                obj.get("bodyRoll").getAsFloat(),
+                obj.get("rightArmPitch").getAsFloat(),
+                obj.get("rightArmYaw").getAsFloat(),
+                obj.get("rightArmRoll").getAsFloat(),
+                obj.get("leftArmPitch").getAsFloat(),
+                obj.get("leftArmYaw").getAsFloat(),
+                obj.get("leftArmRoll").getAsFloat(),
+                obj.get("rightLegPitch").getAsFloat(),
+                obj.get("rightLegYaw").getAsFloat(),
+                obj.get("rightLegRoll").getAsFloat(),
+                obj.get("leftLegPitch").getAsFloat(),
+                obj.get("leftLegYaw").getAsFloat(),
+                obj.get("leftLegRoll").getAsFloat()
+        );
+    }
+
+    private JsonObject serializePose(NPC.NPCPose pose) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("headPitch", pose.getHeadPitch());
+        obj.addProperty("headYaw", pose.getHeadYaw());
+        obj.addProperty("headRoll", pose.getHeadRoll());
+        obj.addProperty("bodyPitch", pose.getBodyPitch());
+        obj.addProperty("bodyYaw", pose.getBodyYaw());
+        obj.addProperty("bodyRoll", pose.getBodyRoll());
+        obj.addProperty("rightArmPitch", pose.getRightArmPitch());
+        obj.addProperty("rightArmYaw", pose.getRightArmYaw());
+        obj.addProperty("rightArmRoll", pose.getRightArmRoll());
+        obj.addProperty("leftArmPitch", pose.getLeftArmPitch());
+        obj.addProperty("leftArmYaw", pose.getLeftArmYaw());
+        obj.addProperty("leftArmRoll", pose.getLeftArmRoll());
+        obj.addProperty("rightLegPitch", pose.getRightLegPitch());
+        obj.addProperty("rightLegYaw", pose.getRightLegYaw());
+        obj.addProperty("rightLegRoll", pose.getRightLegRoll());
+        obj.addProperty("leftLegPitch", pose.getLeftLegPitch());
+        obj.addProperty("leftLegYaw", pose.getLeftLegYaw());
+        obj.addProperty("leftLegRoll", pose.getLeftLegRoll());
         return obj;
     }
 }

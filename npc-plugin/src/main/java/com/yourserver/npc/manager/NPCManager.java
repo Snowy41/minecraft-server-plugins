@@ -203,8 +203,8 @@ public class NPCManager {
     private void sendPlayerInfoPacket(@NotNull Player player, @NotNull NPC npc, boolean add) {
         try {
             if (add) {
-                // ADD player to tab list using PLAYER_INFO_UPDATE (1.19.3+)
-                PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.PLAYER);
+                // ADD player to tab list using PLAYER_INFO (1.19.3+)
+                PacketContainer packet = protocolManager.createPacket(PacketType.Play.Server.PLAYER_INFO);
 
                 // Create WrappedGameProfile directly
                 WrappedGameProfile gameProfile = new WrappedGameProfile(npc.getUuid(), npc.getName());

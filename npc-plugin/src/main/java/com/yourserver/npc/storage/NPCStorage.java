@@ -6,15 +6,16 @@ import com.yourserver.npc.model.NPC;
 import com.yourserver.npc.model.NPCEquipment;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
-import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.util.io.BukkitObjectInputStream;
+import org.bukkit.util.io.BukkitObjectOutputStream;
 
 import java.io.*;
 import java.util.*;
 
 /**
- * Enhanced storage with complete pose persistence.
- * FIXED: Added showSecondLayer field to serialization/deserialization.
+ * Enhanced storage with complete pose persistence and proper equipment serialization.
+ * FIXED: Equipment now properly serializes with all NBT data, enchantments, etc.
  */
 public class NPCStorage {
 
@@ -72,6 +73,7 @@ public class NPCStorage {
                         ? parsePose(obj.getAsJsonObject("pose"))
                         : new NPC.NPCPose();
 
+                // FIXED: Proper equipment deserialization
                 NPCEquipment equipment = obj.has("equipment")
                         ? parseEquipment(obj.getAsJsonObject("equipment"))
                         : new NPCEquipment();
@@ -90,10 +92,6 @@ public class NPCStorage {
         return npcs;
     }
 
-
-    /**
-     * Parses equipment from JSON.
-     */
     private NPCEquipment parseEquipment(JsonObject obj) {
         if (obj == null || obj.isJsonNull()) {
             return new NPCEquipment();
@@ -102,37 +100,44 @@ public class NPCStorage {
         NPCEquipment.Builder builder = NPCEquipment.builder();
 
         if (obj.has("mainHand") && !obj.get("mainHand").isJsonNull()) {
-            builder.mainHand(parseItemStack(obj.getAsJsonObject("mainHand")));
+            builder.mainHand(parseItemStack(obj.get("mainHand").getAsString()));
         }
         if (obj.has("offHand") && !obj.get("offHand").isJsonNull()) {
-            builder.offHand(parseItemStack(obj.getAsJsonObject("offHand")));
+            builder.offHand(parseItemStack(obj.get("offHand").getAsString()));
         }
         if (obj.has("helmet") && !obj.get("helmet").isJsonNull()) {
-            builder.helmet(parseItemStack(obj.getAsJsonObject("helmet")));
+            builder.helmet(parseItemStack(obj.get("helmet").getAsString()));
         }
         if (obj.has("chestplate") && !obj.get("chestplate").isJsonNull()) {
-            builder.chestplate(parseItemStack(obj.getAsJsonObject("chestplate")));
+            builder.chestplate(parseItemStack(obj.get("chestplate").getAsString()));
         }
         if (obj.has("leggings") && !obj.get("leggings").isJsonNull()) {
-            builder.leggings(parseItemStack(obj.getAsJsonObject("leggings")));
+            builder.leggings(parseItemStack(obj.get("leggings").getAsString()));
         }
         if (obj.has("boots") && !obj.get("boots").isJsonNull()) {
-            builder.boots(parseItemStack(obj.getAsJsonObject("boots")));
+            builder.boots(parseItemStack(obj.get("boots").getAsString()));
         }
 
         return builder.build();
     }
 
-    /**
-     * Parses ItemStack from JSON (simple version).
-     */
-    private ItemStack parseItemStack(JsonObject obj) {
+    private ItemStack deserializeItemStack(String base64) {
+        if (base64 == null || base64.isEmpty()) {
+            return null;
+        }
+
         try {
-            Material material = Material.valueOf(obj.get("material").getAsString());
-            int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 1;
-            return new ItemStack(material, amount);
+            byte[] data = Base64.getDecoder().decode(base64);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(data);
+            BukkitObjectInputStream dataInput = new BukkitObjectInputStream(inputStream);
+
+            ItemStack item = (ItemStack) dataInput.readObject();
+
+            dataInput.close();
+            return item;
+
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to parse item: " + e.getMessage());
+            plugin.getLogger().warning("Failed to deserialize item: " + e.getMessage());
             return null;
         }
     }
@@ -159,9 +164,10 @@ public class NPCStorage {
             npc.getHologramLines().forEach(hologram::add);
             obj.add("hologram", hologram);
 
-            // Save pose (now includes showSecondLayer)
+            // Save pose (includes showSecondLayer)
             obj.add("pose", serializePose(npc.getPose()));
 
+            // FIXED: Proper equipment serialization
             if (npc.getEquipment().hasEquipment()) {
                 obj.add("equipment", serializeEquipment(npc.getEquipment()));
             }
@@ -176,57 +182,43 @@ public class NPCStorage {
         }
     }
 
-    /**
-     * Deserializes an ItemStack from Base64 string.
-     */
-    private ItemStack deserializeItem(String data) {
-        try {
-            byte[] bytes = Base64.getDecoder().decode(data);
-            return ItemStack.deserializeBytes(bytes);
-        } catch (Exception e) {
-            plugin.getLogger().warning("Failed to deserialize item: " + e.getMessage());
-            return null;
-        }
-    }
-
-    /**
-     * Serializes equipment to JSON.
-     */
     private JsonObject serializeEquipment(NPCEquipment equipment) {
         JsonObject obj = new JsonObject();
 
         if (equipment.getMainHand() != null) {
-            obj.add("mainHand", serializeItemStack(equipment.getMainHand()));
+            obj.addProperty("mainHand", serializeItemStack(equipment.getMainHand()));
         }
         if (equipment.getOffHand() != null) {
-            obj.add("offHand", serializeItemStack(equipment.getOffHand()));
+            obj.addProperty("offHand", serializeItemStack(equipment.getOffHand()));
         }
         if (equipment.getHelmet() != null) {
-            obj.add("helmet", serializeItemStack(equipment.getHelmet()));
+            obj.addProperty("helmet", serializeItemStack(equipment.getHelmet()));
         }
         if (equipment.getChestplate() != null) {
-            obj.add("chestplate", serializeItemStack(equipment.getChestplate()));
+            obj.addProperty("chestplate", serializeItemStack(equipment.getChestplate()));
         }
         if (equipment.getLeggings() != null) {
-            obj.add("leggings", serializeItemStack(equipment.getLeggings()));
+            obj.addProperty("leggings", serializeItemStack(equipment.getLeggings()));
         }
         if (equipment.getBoots() != null) {
-            obj.add("boots", serializeItemStack(equipment.getBoots()));
+            obj.addProperty("boots", serializeItemStack(equipment.getBoots()));
         }
 
         return obj;
     }
 
     /**
-     * Serializes ItemStack to JSON (simple version).
+     * Serializes ItemStack to Base64 string (preserves ALL data).
      */
-    private JsonObject serializeItemStack(ItemStack item) {
-        JsonObject obj = new JsonObject();
-        obj.addProperty("material", item.getType().name());
-        obj.addProperty("amount", item.getAmount());
-        return obj;
+    private String serializeItemStack(ItemStack item) {
+        try {
+            byte[] bytes = item.serializeAsBytes();
+            return Base64.getEncoder().encodeToString(bytes);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to serialize item: " + e.getMessage());
+            return null;
+        }
     }
-
 
     private Location parseLocation(JsonObject obj) {
         return new Location(
@@ -237,6 +229,19 @@ public class NPCStorage {
                 obj.get("yaw").getAsFloat(),
                 obj.get("pitch").getAsFloat()
         );
+    }
+
+    /**
+     * Deserializes ItemStack from Base64 string.
+     */
+    private ItemStack parseItemStack(String data) {
+        try {
+            byte[] bytes = Base64.getDecoder().decode(data);
+            return ItemStack.deserializeBytes(bytes);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to deserialize item: " + e.getMessage());
+            return null;
+        }
     }
 
     private JsonObject serializeLocation(Location loc) {
@@ -264,11 +269,9 @@ public class NPCStorage {
     }
 
     /**
-     * Parses pose from JSON.
-     * FIXED: Added showSecondLayer field with backward compatibility.
+     * Parses pose from JSON with showSecondLayer field.
      */
     private NPC.NPCPose parsePose(JsonObject obj) {
-        // Get all rotation values
         float headPitch = obj.get("headPitch").getAsFloat();
         float headYaw = obj.get("headYaw").getAsFloat();
         float headRoll = obj.get("headRoll").getAsFloat();
@@ -288,10 +291,9 @@ public class NPCStorage {
         float leftLegYaw = obj.get("leftLegYaw").getAsFloat();
         float leftLegRoll = obj.get("leftLegRoll").getAsFloat();
 
-        // Get showSecondLayer with default value (true) for backward compatibility
         boolean showSecondLayer = obj.has("showSecondLayer")
                 ? obj.get("showSecondLayer").getAsBoolean()
-                : true; // Default to true for existing NPCs
+                : true;
 
         return new NPC.NPCPose(
                 headPitch, headYaw, headRoll,
@@ -305,13 +307,11 @@ public class NPCStorage {
     }
 
     /**
-     * Serializes pose to JSON.
-     * FIXED: Added showSecondLayer field.
+     * Serializes pose to JSON with showSecondLayer field.
      */
     private JsonObject serializePose(NPC.NPCPose pose) {
         JsonObject obj = new JsonObject();
 
-        // Serialize all rotation values
         obj.addProperty("headPitch", pose.getHeadPitch());
         obj.addProperty("headYaw", pose.getHeadYaw());
         obj.addProperty("headRoll", pose.getHeadRoll());
@@ -330,8 +330,6 @@ public class NPCStorage {
         obj.addProperty("leftLegPitch", pose.getLeftLegPitch());
         obj.addProperty("leftLegYaw", pose.getLeftLegYaw());
         obj.addProperty("leftLegRoll", pose.getLeftLegRoll());
-
-        // Add showSecondLayer field (NEW!)
         obj.addProperty("showSecondLayer", pose.isShowSecondLayer());
 
         return obj;

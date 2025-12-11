@@ -7,6 +7,7 @@ import com.yourserver.npc.model.NPCEquipment;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
@@ -73,6 +74,7 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
             case "hologram", "holo" -> handleHologram(sender, args);
             case "look" -> handleLook(sender, args);
             case "equip" -> handleEquip(sender, args);
+            case "autolook" -> handleAutoLook(sender, args);
             default -> sendHelp(sender);
         }
 
@@ -114,6 +116,24 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("  3. ", NamedTextColor.DARK_GRAY)
                 .append(Component.text("/npc hologram " + id + " add <text>", NamedTextColor.WHITE)));
         sender.sendMessage(Component.empty());
+    }
+
+    private void handleAutoLook(CommandSender sender, String[] args) {
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /npc autolook <id> <on|off>", NamedTextColor.RED));
+            return;
+        }
+
+        String id = args[1];
+        boolean enable = args[2].equalsIgnoreCase("on");
+
+        if (enable) {
+            npcManager.enableAutoLook(id);
+            sender.sendMessage(Component.text("✓ Auto-look enabled for: " + id, NamedTextColor.GREEN));
+        } else {
+            npcManager.disableAutoLook(id);
+            sender.sendMessage(Component.text("✓ Auto-look disabled for: " + id, NamedTextColor.GREEN));
+        }
     }
 
     private void handleRemove(CommandSender sender, String[] args) {
@@ -349,18 +369,52 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        // Remove and recreate at player location
+        // Store old data
+        NPC.NPCPose oldPose = npc.getPose().copy();
+        List<String> oldHologram = new ArrayList<>(npc.getHologramLines());
+        NPCEquipment oldEquipment = npc.getEquipment().copy();
+        NPC.Action oldAction = npc.getAction();
+
+        // Remove old NPC
         npcManager.removeNPC(id);
-        npcManager.createNPC(id, npc.getName(), player.getLocation(), npc.getAction());
 
-        // Re-apply pose and hologram
-        NPC updatedNPC = npcManager.getNPC(id);
-        updatedNPC.setPose(npc.getPose());
-        for (String line : npc.getHologramLines()) {
-            updatedNPC.addHologramLine(line);
-        }
+        // Create at new location
+        npcManager.createNPC(id, npc.getName(), player.getLocation(), oldAction);
 
-        sender.sendMessage(Component.text("✓ Moved NPC to your location!", NamedTextColor.GREEN));
+        // Wait for skin to load, then restore settings
+        Bukkit.getScheduler().runTaskLater(
+                Bukkit.getPluginManager().getPlugin("NPCPlugin"),
+                () -> {
+                    NPC updatedNPC = npcManager.getNPC(id);
+                    if (updatedNPC != null) {
+                        // Restore pose
+                        updatedNPC.setPose(oldPose);
+                        npcManager.updateNPCPose(updatedNPC);
+
+                        // Restore equipment
+                        updatedNPC.setEquipment(oldEquipment);
+                        npcManager.updateNPCEquipment(id, oldEquipment);
+
+                        // Restore hologram
+                        for (String line : oldHologram) {
+                            updatedNPC.addHologramLine(line);
+                        }
+
+                        // Refresh everything
+                        npcManager.removeNPC(id);
+                        npcManager.createNPC(id, npc.getName(), player.getLocation(), oldAction);
+                        NPC finalNPC = npcManager.getNPC(id);
+                        finalNPC.setPose(oldPose);
+                        finalNPC.setEquipment(oldEquipment);
+                        for (String line : oldHologram) {
+                            finalNPC.addHologramLine(line);
+                        }
+                    }
+                },
+                40L // 2 seconds for skin fetch
+        );
+
+        sender.sendMessage(Component.text("✓ Moving NPC... (wait 2s)", NamedTextColor.GREEN));
     }
 
     private void handleAction(CommandSender sender, String[] args) {

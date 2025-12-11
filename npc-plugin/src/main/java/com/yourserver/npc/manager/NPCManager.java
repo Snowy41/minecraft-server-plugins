@@ -16,6 +16,7 @@ import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.scheduler.BukkitTask;
 import org.joml.Vector3f;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -35,6 +36,8 @@ public class NPCManager {
     private final ProtocolManager protocolManager;
     private final NPCRegistry registry;
     private final NPCLookHandler lookHandler;
+    private final Map<String, Boolean> autoLookEnabled = new ConcurrentHashMap<>();
+    private BukkitTask lookTrackingTask;
 
     // Track players in editor mode
     private final Map<UUID, String> editMode; // Player UUID -> NPC ID being edited
@@ -113,6 +116,41 @@ public class NPCManager {
     }
 
     /**
+     * Refreshes an NPC for all players (pose, equipment, hologram).
+     * Call this after ANY visual change.
+     */
+    private void refreshNPCForAllPlayers(@NotNull NPC npc) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            // 1. Update metadata (pose + skin layer)
+            sendEntityMetadataPacket(player, npc);
+
+            // 2. Update equipment
+            if (npc.getEquipment().hasEquipment()) {
+                sendEquipmentPacket(player, npc);
+            }
+
+            // 3. Refresh hologram (despawn old, spawn new)
+            if (!npc.getHologramLines().isEmpty()) {
+                // Despawn old hologram
+                for (int hologramId : npc.getHologramEntityIds()) {
+                    try {
+                        PacketContainer destroyPacket = protocolManager.createPacket(
+                                PacketType.Play.Server.ENTITY_DESTROY
+                        );
+                        destroyPacket.getIntLists().write(0, List.of(hologramId));
+                        protocolManager.sendServerPacket(player, destroyPacket);
+                    } catch (Exception e) {
+                        // Silent fail
+                    }
+                }
+
+                // Spawn new hologram
+                spawnHologramForPlayer(player, npc);
+            }
+        }
+    }
+
+    /**
      * Updates NPC pose and refreshes for all players.
      */
     public void updateNPCPose(@NotNull String id, @NotNull NPC.NPCPose pose) {
@@ -126,6 +164,7 @@ public class NPCManager {
             sendEntityMetadataPacket(player, npc);
         }
 
+        refreshNPCForAllPlayers(npc);
         saveAllNPCs();
     }
 
@@ -138,6 +177,7 @@ public class NPCManager {
             sendEntityMetadataPacket(player, npc);
         }
 
+        refreshNPCForAllPlayers(npc);
         saveAllNPCs();
     }
 
@@ -150,12 +190,76 @@ public class NPCManager {
 
         npc.setEquipment(equipment);
 
-        // Send equipment to all players
+        // Send equipment to all players INSTANTLY
         for (Player player : Bukkit.getOnlinePlayers()) {
             sendEquipmentPacket(player, npc);
         }
 
+        refreshNPCForAllPlayers(npc);
         saveAllNPCs();
+    }
+
+    /**
+     * Enables automatic look tracking for an NPC.
+     * NPC will automatically look at nearest player within 5 blocks.
+     */
+    public void enableAutoLook(@NotNull String id) {
+        autoLookEnabled.put(id, true);
+        startLookTrackingTask();
+    }
+
+    /**
+     * Disables automatic look tracking for an NPC.
+     */
+    public void disableAutoLook(@NotNull String id) {
+        autoLookEnabled.remove(id);
+    }
+
+    public void updateNPCEquipment(@NotNull NPC npc) {
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendEquipmentPacket(player, npc);
+        }
+        saveAllNPCs();
+    }
+
+    /**
+     * Starts the look tracking task (runs every 10 ticks = 0.5s).
+     */
+    private void startLookTrackingTask() {
+        if (lookTrackingTask != null) return;
+
+        lookTrackingTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
+            for (String npcId : autoLookEnabled.keySet()) {
+                NPC npc = registry.getNPC(npcId);
+                if (npc == null) continue;
+
+                Player nearest = findNearestPlayer(npc, 5.0);
+                if (nearest != null) {
+                    // Make NPC look at nearest player for ALL viewers
+                    for (Player viewer : Bukkit.getOnlinePlayers()) {
+                        lookHandler.lookAtPlayer(npc, viewer, nearest);
+                    }
+                } else {
+                    // No player nearby, reset look
+                    for (Player viewer : Bukkit.getOnlinePlayers()) {
+                        lookHandler.resetLook(npc, viewer);
+                    }
+                }
+            }
+        }, 0L, 10L); // Every 0.5 seconds
+    }
+
+    // In NPCManager.java
+    public void refreshNPC(@NotNull String id) {
+        NPC npc = registry.getNPC(id);
+        if (npc == null) return;
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendEntityMetadataPacket(player, npc);
+            if (npc.getEquipment().hasEquipment()) {
+                sendEquipmentPacket(player, npc);
+            }
+        }
     }
 
     /**
@@ -196,6 +300,7 @@ public class NPCManager {
 
         return nearest;
     }
+
 
     /**
      * Resets NPC look direction.

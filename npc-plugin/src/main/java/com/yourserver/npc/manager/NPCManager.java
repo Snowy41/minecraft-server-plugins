@@ -23,6 +23,7 @@ import static com.comphenix.protocol.PacketType.Play.Server.*;
 
 /**
  * Enhanced NPC Manager with proper pose support and second skin layer.
+ * FIXED: Added missing updateNPCPose(NPC) overload for editor mode.
  */
 public class NPCManager {
 
@@ -113,6 +114,9 @@ public class NPCManager {
 
     /**
      * Updates NPC pose and refreshes for all players.
+     *
+     * @param id The NPC ID
+     * @param pose The new pose
      */
     public void updateNPCPose(@NotNull String id, @NotNull NPC.NPCPose pose) {
         NPC npc = npcs.get(id);
@@ -125,6 +129,22 @@ public class NPCManager {
             sendEntityMetadataPacket(player, npc);
         }
 
+        storage.saveNPCs(new ArrayList<>(npcs.values()));
+    }
+
+    /**
+     * Updates NPC pose (overload accepting NPC directly).
+     * FIXED: This method was missing and caused editor mode to fail.
+     *
+     * @param npc The NPC to update
+     */
+    public void updateNPCPose(@NotNull NPC npc) {
+        // Refresh NPC for all players
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendEntityMetadataPacket(player, npc);
+        }
+
+        // Save to storage
         storage.saveNPCs(new ArrayList<>(npcs.values()));
     }
 
@@ -318,10 +338,8 @@ public class NPCManager {
             WrappedDataWatcher watcher = new WrappedDataWatcher();
 
             // Index 17: Skin layers (byte)
-            // 0x01 = Cape, 0x02 = Jacket, 0x04 = Left Sleeve, 0x08 = Right Sleeve
-            // 0x10 = Left Pants, 0x20 = Right Pants, 0x40 = Hat
-            // 0x7F = All layers enabled
-            byte skinLayers = (byte) 0x7F; // Enable ALL skin layers (including hat/jacket)
+            // Dynamically set based on NPC's showSecondLayer setting
+            byte skinLayers = npc.getPose().isShowSecondLayer() ? (byte) 0x7F : (byte) 0x00;
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(17,
                     WrappedDataWatcher.Registry.get(Byte.class)), skinLayers);
 

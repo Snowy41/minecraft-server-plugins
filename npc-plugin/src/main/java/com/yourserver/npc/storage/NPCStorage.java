@@ -10,7 +10,8 @@ import java.io.*;
 import java.util.*;
 
 /**
- * Enhanced storage with pose persistence.
+ * Enhanced storage with complete pose persistence.
+ * FIXED: Added showSecondLayer field to serialization/deserialization.
  */
 public class NPCStorage {
 
@@ -104,7 +105,7 @@ public class NPCStorage {
             npc.getHologramLines().forEach(hologram::add);
             obj.add("hologram", hologram);
 
-            // Save pose
+            // Save pose (now includes showSecondLayer)
             obj.add("pose", serializePose(npc.getPose()));
 
             array.add(obj);
@@ -152,31 +153,55 @@ public class NPCStorage {
         return obj;
     }
 
+    /**
+     * Parses pose from JSON.
+     * FIXED: Added showSecondLayer field with backward compatibility.
+     */
     private NPC.NPCPose parsePose(JsonObject obj) {
+        // Get all rotation values
+        float headPitch = obj.get("headPitch").getAsFloat();
+        float headYaw = obj.get("headYaw").getAsFloat();
+        float headRoll = obj.get("headRoll").getAsFloat();
+        float bodyPitch = obj.get("bodyPitch").getAsFloat();
+        float bodyYaw = obj.get("bodyYaw").getAsFloat();
+        float bodyRoll = obj.get("bodyRoll").getAsFloat();
+        float rightArmPitch = obj.get("rightArmPitch").getAsFloat();
+        float rightArmYaw = obj.get("rightArmYaw").getAsFloat();
+        float rightArmRoll = obj.get("rightArmRoll").getAsFloat();
+        float leftArmPitch = obj.get("leftArmPitch").getAsFloat();
+        float leftArmYaw = obj.get("leftArmYaw").getAsFloat();
+        float leftArmRoll = obj.get("leftArmRoll").getAsFloat();
+        float rightLegPitch = obj.get("rightLegPitch").getAsFloat();
+        float rightLegYaw = obj.get("rightLegYaw").getAsFloat();
+        float rightLegRoll = obj.get("rightLegRoll").getAsFloat();
+        float leftLegPitch = obj.get("leftLegPitch").getAsFloat();
+        float leftLegYaw = obj.get("leftLegYaw").getAsFloat();
+        float leftLegRoll = obj.get("leftLegRoll").getAsFloat();
+
+        // Get showSecondLayer with default value (true) for backward compatibility
+        boolean showSecondLayer = obj.has("showSecondLayer")
+                ? obj.get("showSecondLayer").getAsBoolean()
+                : true; // Default to true for existing NPCs
+
         return new NPC.NPCPose(
-                obj.get("headPitch").getAsFloat(),
-                obj.get("headYaw").getAsFloat(),
-                obj.get("headRoll").getAsFloat(),
-                obj.get("bodyPitch").getAsFloat(),
-                obj.get("bodyYaw").getAsFloat(),
-                obj.get("bodyRoll").getAsFloat(),
-                obj.get("rightArmPitch").getAsFloat(),
-                obj.get("rightArmYaw").getAsFloat(),
-                obj.get("rightArmRoll").getAsFloat(),
-                obj.get("leftArmPitch").getAsFloat(),
-                obj.get("leftArmYaw").getAsFloat(),
-                obj.get("leftArmRoll").getAsFloat(),
-                obj.get("rightLegPitch").getAsFloat(),
-                obj.get("rightLegYaw").getAsFloat(),
-                obj.get("rightLegRoll").getAsFloat(),
-                obj.get("leftLegPitch").getAsFloat(),
-                obj.get("leftLegYaw").getAsFloat(),
-                obj.get("leftLegRoll").getAsFloat()
+                headPitch, headYaw, headRoll,
+                bodyPitch, bodyYaw, bodyRoll,
+                rightArmPitch, rightArmYaw, rightArmRoll,
+                leftArmPitch, leftArmYaw, leftArmRoll,
+                rightLegPitch, rightLegYaw, rightLegRoll,
+                leftLegPitch, leftLegYaw, leftLegRoll,
+                showSecondLayer
         );
     }
 
+    /**
+     * Serializes pose to JSON.
+     * FIXED: Added showSecondLayer field.
+     */
     private JsonObject serializePose(NPC.NPCPose pose) {
         JsonObject obj = new JsonObject();
+
+        // Serialize all rotation values
         obj.addProperty("headPitch", pose.getHeadPitch());
         obj.addProperty("headYaw", pose.getHeadYaw());
         obj.addProperty("headRoll", pose.getHeadRoll());
@@ -195,6 +220,10 @@ public class NPCStorage {
         obj.addProperty("leftLegPitch", pose.getLeftLegPitch());
         obj.addProperty("leftLegYaw", pose.getLeftLegYaw());
         obj.addProperty("leftLegRoll", pose.getLeftLegRoll());
+
+        // Add showSecondLayer field (NEW!)
+        obj.addProperty("showSecondLayer", pose.isShowSecondLayer());
+
         return obj;
     }
 }

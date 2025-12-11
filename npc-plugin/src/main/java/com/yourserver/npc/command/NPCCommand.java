@@ -3,14 +3,17 @@ package com.yourserver.npc.command;
 import com.yourserver.npc.NPCPlugin;
 import com.yourserver.npc.manager.NPCManager;
 import com.yourserver.npc.model.NPC;
+import com.yourserver.npc.model.NPCEquipment;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
+import org.bukkit.Material;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
 import org.bukkit.command.TabCompleter;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -68,6 +71,8 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
             case "move" -> handleMove(sender, args);
             case "action" -> handleAction(sender, args);
             case "hologram", "holo" -> handleHologram(sender, args);
+            case "look" -> handleLook(sender, args);
+            case "equip" -> handleEquip(sender, args);
             default -> sendHelp(sender);
         }
 
@@ -460,6 +465,8 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - Set action", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/npc hologram <id> add <line>", NamedTextColor.WHITE)
                 .append(Component.text(" - Add hologram", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/npc equip <id> <slot>", NamedTextColor.WHITE)
+                .append(Component.text(" - Equip item (hold item)", NamedTextColor.GRAY)));
         sender.sendMessage(Component.empty());
     }
 
@@ -468,7 +475,8 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
     public List<String> onTabComplete(@NotNull CommandSender sender, @NotNull Command command,
                                       @NotNull String label, @NotNull String[] args) {
         if (args.length == 1) {
-            return Arrays.asList("create", "remove", "list", "edit", "pose", "move", "action", "hologram");
+            return Arrays.asList("create", "remove", "list", "edit", "pose", "move",
+                    "action", "hologram", "equip");
         }
 
         if (args.length == 2 && !args[0].equalsIgnoreCase("create") && !args[0].equalsIgnoreCase("list")) {
@@ -494,6 +502,9 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                     npcManager.isInEditorMode(player)) {
                 return Arrays.asList("pitch", "yaw", "roll");
             }
+            if(args[0].equalsIgnoreCase("equip") ) {
+                return Arrays.asList("mainhand", "offhand", "helmet", "chestplate", "leggings", "boots");
+            }
         }
 
         if (args.length == 4) {
@@ -508,4 +519,77 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         return List.of();
     }
+
+    private void handleLook(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can use this!", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 2) {
+            sender.sendMessage(Component.text("Usage: /npc look <id>", NamedTextColor.RED));
+            return;
+        }
+
+        String id = args[1];
+        NPC npc = npcManager.getNPC(id);
+
+        if (npc == null) {
+            sender.sendMessage(Component.text("NPC not found!", NamedTextColor.RED));
+            return;
+        }
+
+        npcManager.makeNPCLookAtPlayer(npc, player);
+        sender.sendMessage(Component.text("✓ NPC is now looking at you!", NamedTextColor.GREEN));
+    }
+
+    private void handleEquip(CommandSender sender, String[] args) {
+        if (!(sender instanceof Player player)) {
+            sender.sendMessage(Component.text("Only players can equip NPCs!", NamedTextColor.RED));
+            return;
+        }
+
+        if (args.length < 3) {
+            sender.sendMessage(Component.text("Usage: /npc equip <id> <slot>", NamedTextColor.RED));
+            sender.sendMessage(Component.text("Slots: mainhand, offhand, helmet, chestplate, leggings, boots",
+                    NamedTextColor.GRAY));
+            return;
+        }
+
+        String id = args[1];
+        String slot = args[2].toLowerCase();
+
+        NPC npc = npcManager.getNPC(id);
+        if (npc == null) {
+            sender.sendMessage(Component.text("NPC not found!", NamedTextColor.RED));
+            return;
+        }
+
+        ItemStack item = player.getInventory().getItemInMainHand();
+        if (item.getType() == Material.AIR) {
+            sender.sendMessage(Component.text("Hold an item to equip!", NamedTextColor.RED));
+            return;
+        }
+
+        NPCEquipment equipment = npc.getEquipment();
+
+        switch (slot) {
+            case "mainhand", "hand" -> equipment.setMainHand(item.clone());
+            case "offhand" -> equipment.setOffHand(item.clone());
+            case "helmet", "head" -> equipment.setHelmet(item.clone());
+            case "chestplate", "chest" -> equipment.setChestplate(item.clone());
+            case "leggings", "legs" -> equipment.setLeggings(item.clone());
+            case "boots", "feet" -> equipment.setBoots(item.clone());
+            default -> {
+                sender.sendMessage(Component.text("Invalid slot!", NamedTextColor.RED));
+                return;
+            }
+        }
+
+        npcManager.setNPCEquipment(id, equipment);
+        sender.sendMessage(Component.text("✓ Equipped " + item.getType().name() + " in " + slot,
+                NamedTextColor.GREEN));
+    }
+
+
 }

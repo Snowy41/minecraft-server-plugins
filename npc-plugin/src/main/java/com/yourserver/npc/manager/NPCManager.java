@@ -7,7 +7,9 @@ import com.comphenix.protocol.wrappers.*;
 import com.yourserver.npc.NPCPlugin;
 import com.yourserver.npc.model.NPC;
 import com.yourserver.npc.model.NPCEquipment;
+import com.yourserver.npc.registry.NPCRegistry;
 import com.yourserver.npc.storage.NPCStorage;
+import com.yourserver.npc.util.NPCLookHandler;
 import com.yourserver.npc.util.SkinFetcher;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
@@ -24,16 +26,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import static com.comphenix.protocol.PacketType.Play.Server.*;
 
 /**
- * Enhanced NPC Manager with proper pose support and second skin layer.
- * FIXED: Added missing updateNPCPose(NPC) overload for editor mode.
+ * Enhanced NPC Manager with NPCRegistry, equipment support, and look handler.
  */
 public class NPCManager {
 
     private final NPCPlugin plugin;
     private final NPCStorage storage;
     private final ProtocolManager protocolManager;
-    private final Map<String, NPC> npcs;
-    private final Map<Integer, String> entityIdToNPC;
+    private final NPCRegistry registry;
+    private final NPCLookHandler lookHandler;
 
     // Track players in editor mode
     private final Map<UUID, String> editMode; // Player UUID -> NPC ID being edited
@@ -42,8 +43,8 @@ public class NPCManager {
         this.plugin = plugin;
         this.storage = storage;
         this.protocolManager = protocolManager;
-        this.npcs = new ConcurrentHashMap<>();
-        this.entityIdToNPC = new ConcurrentHashMap<>();
+        this.registry = new NPCRegistry();
+        this.lookHandler = new NPCLookHandler(protocolManager);
         this.editMode = new ConcurrentHashMap<>();
     }
 
@@ -60,7 +61,7 @@ public class NPCManager {
                 SkinFetcher.fetchSkinAsync(npc.getName()).thenAccept(skinData -> {
                     if (skinData != null) {
                         npc.setSkin(skinData[0], skinData[1]);
-                        storage.saveNPCs(new ArrayList<>(npcs.values()));
+                        saveAllNPCs();
                     }
                     spawnNPCForAllPlayers(npc);
                 });
@@ -68,11 +69,10 @@ public class NPCManager {
                 spawnNPCForAllPlayers(npc);
             }
 
-            npcs.put(npc.getId(), npc);
-            entityIdToNPC.put(npc.getEntityId(), npc.getId());
+            registry.register(npc);
         }
 
-        plugin.getLogger().info("✓ Loaded " + npcs.size() + " NPCs");
+        plugin.getLogger().info("✓ Loaded " + registry.size() + " NPCs");
     }
 
     /**
@@ -80,7 +80,7 @@ public class NPCManager {
      */
     public void createNPC(@NotNull String id, @NotNull String playerName,
                           @NotNull Location location, @NotNull NPC.Action action) {
-        if (npcs.containsKey(id)) {
+        if (registry.exists(id)) {
             plugin.getLogger().warning("NPC already exists: " + id);
             return;
         }
@@ -94,34 +94,29 @@ public class NPCManager {
                 plugin.getLogger().info("  ✓ Fetched skin for: " + playerName);
             }
             spawnNPCForAllPlayers(npc);
-            storage.saveNPCs(new ArrayList<>(npcs.values()));
+            saveAllNPCs();
         });
 
-        npcs.put(id, npc);
-        entityIdToNPC.put(npc.getEntityId(), id);
+        registry.register(npc);
     }
 
     /**
      * Removes an NPC.
      */
     public void removeNPC(@NotNull String id) {
-        NPC npc = npcs.remove(id);
+        NPC npc = registry.unregister(id);
         if (npc == null) return;
 
-        entityIdToNPC.remove(npc.getEntityId());
         despawnNPCForAllPlayers(npc);
-        storage.saveNPCs(new ArrayList<>(npcs.values()));
+        saveAllNPCs();
         plugin.getLogger().info("✓ Removed NPC: " + id);
     }
 
     /**
      * Updates NPC pose and refreshes for all players.
-     *
-     * @param id The NPC ID
-     * @param pose The new pose
      */
     public void updateNPCPose(@NotNull String id, @NotNull NPC.NPCPose pose) {
-        NPC npc = npcs.get(id);
+        NPC npc = registry.getNPC(id);
         if (npc == null) return;
 
         npc.setPose(pose);
@@ -131,14 +126,11 @@ public class NPCManager {
             sendEntityMetadataPacket(player, npc);
         }
 
-        storage.saveNPCs(new ArrayList<>(npcs.values()));
+        saveAllNPCs();
     }
 
     /**
      * Updates NPC pose (overload accepting NPC directly).
-     * FIXED: This method was missing and caused editor mode to fail.
-     *
-     * @param npc The NPC to update
      */
     public void updateNPCPose(@NotNull NPC npc) {
         // Refresh NPC for all players
@@ -146,10 +138,77 @@ public class NPCManager {
             sendEntityMetadataPacket(player, npc);
         }
 
-        // Save to storage
-        storage.saveNPCs(new ArrayList<>(npcs.values()));
+        saveAllNPCs();
     }
 
+    /**
+     * Updates NPC equipment and refreshes visually.
+     */
+    public void updateNPCEquipment(@NotNull String id, @NotNull NPCEquipment equipment) {
+        NPC npc = registry.getNPC(id);
+        if (npc == null) return;
+
+        npc.setEquipment(equipment);
+
+        // Send equipment to all players
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendEquipmentPacket(player, npc);
+        }
+
+        saveAllNPCs();
+    }
+
+    /**
+     * Makes an NPC look at a player.
+     */
+    public void makeNPCLookAt(@NotNull String id, @NotNull Player viewer, @NotNull Location target) {
+        NPC npc = registry.getNPC(id);
+        if (npc == null) return;
+
+        lookHandler.lookAt(npc, viewer, target);
+    }
+
+    public void makeNPCLookAtPlayer(@NotNull NPC npc, @NotNull Player target) {
+        // Make NPC look at the target for all online players
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            lookHandler.lookAtPlayer(npc, viewer, target);
+        }
+    }
+
+    /**
+     * Finds the nearest player to an NPC within radius.
+     */
+    @Nullable
+    private Player findNearestPlayer(@NotNull NPC npc, double maxDistance) {
+        Location npcLoc = npc.getLocation();
+        Player nearest = null;
+        double nearestDistance = maxDistance;
+
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            if (!player.getWorld().equals(npcLoc.getWorld())) continue;
+
+            double distance = player.getLocation().distance(npcLoc);
+            if (distance < nearestDistance) {
+                nearestDistance = distance;
+                nearest = player;
+            }
+        }
+
+        return nearest;
+    }
+
+    /**
+     * Resets NPC look direction.
+     */
+    public void resetNPCLook(@NotNull NPC npc) {
+        for (Player viewer : Bukkit.getOnlinePlayers()) {
+            lookHandler.resetLook(npc, viewer);
+        }
+    }
+
+    /**
+     * Sends equipment packet to player.
+     */
     private void sendEquipmentPacket(@NotNull Player player, @NotNull NPC npc) {
         if (!npc.getEquipment().hasEquipment()) {
             return;
@@ -196,7 +255,7 @@ public class NPCManager {
      * Enters editor mode for an NPC.
      */
     public void enterEditorMode(@NotNull Player player, @NotNull String npcId) {
-        NPC npc = npcs.get(npcId);
+        NPC npc = registry.getNPC(npcId);
         if (npc == null) {
             player.sendMessage("§cNPC not found!");
             return;
@@ -218,7 +277,7 @@ public class NPCManager {
         String npcId = editMode.remove(player.getUniqueId());
         if (npcId != null) {
             player.sendMessage("§a✓ Exited editor mode");
-            storage.saveNPCs(new ArrayList<>(npcs.values()));
+            saveAllNPCs();
         }
     }
 
@@ -228,7 +287,7 @@ public class NPCManager {
     @Nullable
     public NPC getEditingNPC(@NotNull Player player) {
         String npcId = editMode.get(player.getUniqueId());
-        return npcId != null ? npcs.get(npcId) : null;
+        return npcId != null ? registry.getNPC(npcId) : null;  // ✅ USE REGISTRY
     }
 
     /**
@@ -248,7 +307,7 @@ public class NPCManager {
     }
 
     /**
-     * Spawns NPC for a specific player with proper pose and second layer.
+     * Spawns NPC for a specific player with proper pose and equipment.
      */
     public void spawnNPCForPlayer(@NotNull Player player, @NotNull NPC npc) {
         try {
@@ -258,15 +317,20 @@ public class NPCManager {
             // 2. Spawn entity
             sendSpawnPlayerPacket(player, npc);
 
-            // 3. Set entity metadata (pose + second layer)
+            // 3. Set metadata (pose + skin layer)
             sendEntityMetadataPacket(player, npc);
 
-            // 4. Remove from tab list after delay
+            // 4. Send equipment  ✅ ADD THIS
+            if (npc.getEquipment().hasEquipment()) {
+                sendEquipmentPacket(player, npc);
+            }
+
+            // 5. Remove from tab list
             Bukkit.getScheduler().runTaskLater(plugin, () -> {
                 sendPlayerInfoPacket(player, npc, false);
             }, 40L);
 
-            // 5. Spawn hologram if present
+            // 6. Spawn hologram
             if (!npc.getHologramLines().isEmpty()) {
                 spawnHologramForPlayer(player, npc);
             }
@@ -372,7 +436,6 @@ public class NPCManager {
 
     /**
      * Sends entity metadata packet with pose and second skin layer.
-     * THIS IS THE KEY METHOD FOR POSES!
      */
     private void sendEntityMetadataPacket(@NotNull Player player, @NotNull NPC npc) {
         try {
@@ -382,7 +445,6 @@ public class NPCManager {
             WrappedDataWatcher watcher = new WrappedDataWatcher();
 
             // Index 17: Skin layers (byte)
-            // Dynamically set based on NPC's showSecondLayer setting
             byte skinLayers = npc.getPose().isShowSecondLayer() ? (byte) 0x7F : (byte) 0x00;
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(17,
                     WrappedDataWatcher.Registry.get(Byte.class)), skinLayers);
@@ -390,32 +452,26 @@ public class NPCManager {
             // Pose data (indices 18-23 for 1.21.8)
             NPC.NPCPose pose = npc.getPose();
 
-            // Head pose (index 18)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(18,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getHeadPitch(), pose.getHeadYaw(), pose.getHeadRoll()));
 
-            // Body pose (index 19)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(19,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getBodyPitch(), pose.getBodyYaw(), pose.getBodyRoll()));
 
-            // Left arm (index 20)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(20,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getLeftArmPitch(), pose.getLeftArmYaw(), pose.getLeftArmRoll()));
 
-            // Right arm (index 21)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(21,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getRightArmPitch(), pose.getRightArmYaw(), pose.getRightArmRoll()));
 
-            // Left leg (index 22)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(22,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getLeftLegPitch(), pose.getLeftLegYaw(), pose.getLeftLegRoll()));
 
-            // Right leg (index 23)
             watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(23,
                             WrappedDataWatcher.Registry.getVectorSerializer()),
                     createRotationVector(pose.getRightLegPitch(), pose.getRightLegYaw(), pose.getRightLegRoll()));
@@ -431,7 +487,6 @@ public class NPCManager {
 
     /**
      * Creates a rotation vector for entity metadata.
-     * Converts degrees to the format Minecraft expects.
      */
     private Vector3f createRotationVector(float pitch, float yaw, float roll) {
         return new Vector3f(
@@ -486,30 +541,64 @@ public class NPCManager {
     }
 
     /**
+     * Sets equipment for an NPC.
+     */
+    public void setNPCEquipment(@NotNull String id, @NotNull NPCEquipment equipment) {
+        NPC npc = registry.getNPC(id);
+        if (npc == null) return;
+
+        npc.setEquipment(equipment);
+
+        // Refresh equipment for all players
+        for (Player player : Bukkit.getOnlinePlayers()) {
+            sendEquipmentPacket(player, npc);
+        }
+
+        saveAllNPCs();
+    }
+
+    /**
      * Handles NPC interaction.
      */
     public void handleInteraction(@NotNull Player player, @NotNull NPC npc) {
         npc.getAction().execute(plugin, player);
     }
 
+    /**
+     * Saves all NPCs to storage.
+     */
+    private void saveAllNPCs() {
+        storage.saveNPCs(new ArrayList<>(registry.getAllNPCs()));
+    }
+
+    // Public API methods
     @Nullable
     public NPC getNPCByEntityId(int entityId) {
-        String npcId = entityIdToNPC.get(entityId);
-        return npcId != null ? npcs.get(npcId) : null;
+        return registry.getNPCByEntityId(entityId);
     }
 
     @Nullable
     public NPC getNPC(@NotNull String id) {
-        return npcs.get(id);
+        return registry.getNPC(id);
     }
 
     @NotNull
     public Collection<NPC> getAllNPCs() {
-        return new ArrayList<>(npcs.values());
+        return registry.getAllNPCs();
+    }
+
+    @NotNull
+    public Collection<NPC> getNPCsInWorld(@NotNull String worldName) {
+        return registry.getNPCsInWorld(worldName);
+    }
+
+    @NotNull
+    public Collection<NPC> getNPCsNearby(@NotNull Location location, double radius) {
+        return registry.getNPCsNearby(location, radius);
     }
 
     public void removeAllNPCs() {
-        new ArrayList<>(npcs.keySet()).forEach(this::removeNPC);
+        new ArrayList<>(registry.getAllIds()).forEach(this::removeNPC);
     }
 
     private static int generateEntityId() {

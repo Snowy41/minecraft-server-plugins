@@ -86,6 +86,36 @@ public class NPCRegistry {
     }
 
     /**
+     * Updates an NPC's location in the spatial index.
+     * Call this when an NPC moves to keep the spatial index accurate.
+     */
+    public void updateLocation(@NotNull String id, @NotNull Location newLocation) {
+        NPC npc = npcsById.get(id);
+        if (npc == null) {
+            return;
+        }
+
+        String oldWorld = npc.getLocation().getWorld().getName();
+        String newWorld = newLocation.getWorld().getName();
+
+        // If world changed, update world index
+        if (!oldWorld.equals(newWorld)) {
+            Set<String> oldWorldNPCs = npcsByWorld.get(oldWorld);
+            if (oldWorldNPCs != null) {
+                oldWorldNPCs.remove(id);
+                if (oldWorldNPCs.isEmpty()) {
+                    npcsByWorld.remove(oldWorld);
+                }
+            }
+
+            npcsByWorld.computeIfAbsent(newWorld, k -> ConcurrentHashMap.newKeySet())
+                    .add(id);
+        }
+
+        npc.setLocation(newLocation);
+    }
+
+    /**
      * Gets an NPC by entity ID (for click detection).
      */
     @Nullable

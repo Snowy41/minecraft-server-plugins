@@ -3,8 +3,11 @@ package com.yourserver.npc.storage;
 import com.google.gson.*;
 import com.yourserver.npc.NPCPlugin;
 import com.yourserver.npc.model.NPC;
+import com.yourserver.npc.model.NPCEquipment;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
+import org.bukkit.Material;
+import org.bukkit.inventory.ItemStack;
 
 import java.io.*;
 import java.util.*;
@@ -69,8 +72,12 @@ public class NPCStorage {
                         ? parsePose(obj.getAsJsonObject("pose"))
                         : new NPC.NPCPose();
 
+                NPCEquipment equipment = obj.has("equipment")
+                        ? parseEquipment(obj.getAsJsonObject("equipment"))
+                        : new NPCEquipment();
+
                 NPC npc = new NPC(id, name, uuid, entityId, location,
-                        skinTexture, skinSignature, action, hologramLines, pose);
+                        skinTexture, skinSignature, action, hologramLines, pose, equipment);
 
                 npcs.add(npc);
             }
@@ -81,6 +88,53 @@ public class NPCStorage {
         }
 
         return npcs;
+    }
+
+
+    /**
+     * Parses equipment from JSON.
+     */
+    private NPCEquipment parseEquipment(JsonObject obj) {
+        if (obj == null || obj.isJsonNull()) {
+            return new NPCEquipment();
+        }
+
+        NPCEquipment.Builder builder = NPCEquipment.builder();
+
+        if (obj.has("mainHand") && !obj.get("mainHand").isJsonNull()) {
+            builder.mainHand(parseItemStack(obj.getAsJsonObject("mainHand")));
+        }
+        if (obj.has("offHand") && !obj.get("offHand").isJsonNull()) {
+            builder.offHand(parseItemStack(obj.getAsJsonObject("offHand")));
+        }
+        if (obj.has("helmet") && !obj.get("helmet").isJsonNull()) {
+            builder.helmet(parseItemStack(obj.getAsJsonObject("helmet")));
+        }
+        if (obj.has("chestplate") && !obj.get("chestplate").isJsonNull()) {
+            builder.chestplate(parseItemStack(obj.getAsJsonObject("chestplate")));
+        }
+        if (obj.has("leggings") && !obj.get("leggings").isJsonNull()) {
+            builder.leggings(parseItemStack(obj.getAsJsonObject("leggings")));
+        }
+        if (obj.has("boots") && !obj.get("boots").isJsonNull()) {
+            builder.boots(parseItemStack(obj.getAsJsonObject("boots")));
+        }
+
+        return builder.build();
+    }
+
+    /**
+     * Parses ItemStack from JSON (simple version).
+     */
+    private ItemStack parseItemStack(JsonObject obj) {
+        try {
+            Material material = Material.valueOf(obj.get("material").getAsString());
+            int amount = obj.has("amount") ? obj.get("amount").getAsInt() : 1;
+            return new ItemStack(material, amount);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to parse item: " + e.getMessage());
+            return null;
+        }
     }
 
     public void saveNPCs(List<NPC> npcs) {
@@ -108,6 +162,10 @@ public class NPCStorage {
             // Save pose (now includes showSecondLayer)
             obj.add("pose", serializePose(npc.getPose()));
 
+            if (npc.getEquipment().hasEquipment()) {
+                obj.add("equipment", serializeEquipment(npc.getEquipment()));
+            }
+
             array.add(obj);
         }
 
@@ -117,6 +175,58 @@ public class NPCStorage {
             plugin.getLogger().severe("Failed to save NPCs: " + e.getMessage());
         }
     }
+
+    /**
+     * Deserializes an ItemStack from Base64 string.
+     */
+    private ItemStack deserializeItem(String data) {
+        try {
+            byte[] bytes = Base64.getDecoder().decode(data);
+            return ItemStack.deserializeBytes(bytes);
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to deserialize item: " + e.getMessage());
+            return null;
+        }
+    }
+
+    /**
+     * Serializes equipment to JSON.
+     */
+    private JsonObject serializeEquipment(NPCEquipment equipment) {
+        JsonObject obj = new JsonObject();
+
+        if (equipment.getMainHand() != null) {
+            obj.add("mainHand", serializeItemStack(equipment.getMainHand()));
+        }
+        if (equipment.getOffHand() != null) {
+            obj.add("offHand", serializeItemStack(equipment.getOffHand()));
+        }
+        if (equipment.getHelmet() != null) {
+            obj.add("helmet", serializeItemStack(equipment.getHelmet()));
+        }
+        if (equipment.getChestplate() != null) {
+            obj.add("chestplate", serializeItemStack(equipment.getChestplate()));
+        }
+        if (equipment.getLeggings() != null) {
+            obj.add("leggings", serializeItemStack(equipment.getLeggings()));
+        }
+        if (equipment.getBoots() != null) {
+            obj.add("boots", serializeItemStack(equipment.getBoots()));
+        }
+
+        return obj;
+    }
+
+    /**
+     * Serializes ItemStack to JSON (simple version).
+     */
+    private JsonObject serializeItemStack(ItemStack item) {
+        JsonObject obj = new JsonObject();
+        obj.addProperty("material", item.getType().name());
+        obj.addProperty("amount", item.getAmount());
+        return obj;
+    }
+
 
     private Location parseLocation(JsonObject obj) {
         return new Location(

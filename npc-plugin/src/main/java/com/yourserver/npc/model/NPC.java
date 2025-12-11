@@ -35,6 +35,7 @@ public class NPC {
     private String skinSignature;
     private List<Integer> hologramEntityIds;
 
+    private NPCEquipment equipment;
     // Pose data (in degrees)
     private NPCPose pose;
 
@@ -47,13 +48,15 @@ public class NPC {
         this.action = action;
         this.hologramLines = new ArrayList<>();
         this.hologramEntityIds = new ArrayList<>();
-        this.pose = new NPCPose(); // Default pose
+        this.pose = new NPCPose();
+        this.equipment = new NPCEquipment();
     }
 
     // Full constructor for loading from storage
     public NPC(@NotNull String id, @NotNull String name, @NotNull UUID uuid, int entityId,
                @NotNull Location location, @Nullable String skinTexture, @Nullable String skinSignature,
-               @NotNull Action action, @NotNull List<String> hologramLines, @NotNull NPCPose pose) {
+               @NotNull Action action, @NotNull List<String> hologramLines, @NotNull NPCPose pose,
+               @Nullable NPCEquipment equipment) {
         this.id = id;
         this.name = name;
         this.uuid = uuid;
@@ -65,6 +68,7 @@ public class NPC {
         this.hologramLines = new ArrayList<>(hologramLines);
         this.hologramEntityIds = new ArrayList<>();
         this.pose = pose;
+        this.equipment = equipment != null ? equipment : new NPCEquipment(); // NEW!
     }
 
     public void setSkin(@Nullable String texture, @Nullable String signature) {
@@ -92,6 +96,8 @@ public class NPC {
         return skinTexture != null && !skinTexture.isEmpty();
     }
 
+
+
     // Getters
     public String getId() { return id; }
     public String getName() { return name; }
@@ -107,6 +113,14 @@ public class NPC {
 
     public void setPose(@NotNull NPCPose pose) {
         this.pose = pose;
+    }
+
+    public NPCEquipment getEquipment() {
+        return equipment;
+    }
+
+    public void setEquipment(@NotNull NPCEquipment equipment) {
+        this.equipment = equipment;
     }
 
     private static int generateEntityId() {

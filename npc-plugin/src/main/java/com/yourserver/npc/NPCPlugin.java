@@ -4,6 +4,8 @@ import com.comphenix.protocol.ProtocolLibrary;
 import com.comphenix.protocol.ProtocolManager;
 import com.yourserver.npc.api.NPCAPI;
 import com.yourserver.npc.command.NPCCommand;
+import com.yourserver.npc.editor.NPCEditorManager;
+import com.yourserver.npc.listener.NPCEditorListener;
 import com.yourserver.npc.listener.NPCInteractListener;
 import com.yourserver.npc.listener.PlayerJoinListener;
 import com.yourserver.npc.manager.NPCManager;
@@ -29,6 +31,7 @@ public class NPCPlugin extends JavaPlugin {
     private NPCManager npcManager;
     private ProtocolManager protocolManager;
     private NPCAPI npcAPI;
+    private NPCEditorManager editorManager;
 
     @Override
     public void onLoad() {
@@ -70,10 +73,15 @@ public class NPCPlugin extends JavaPlugin {
             // 6. Initialize public API
             npcAPI = new NPCAPI(npcManager);
             getLogger().info("✓ Public API available");
-
+            editorManager = new NPCEditorManager(this);
             // 7. Register listeners
             protocolManager.addPacketListener(new NPCInteractListener(this, npcManager));
             getLogger().info("✓ ProtocolLib packet listener registered");
+
+            getServer().getPluginManager().registerEvents(
+                    new NPCEditorListener(this, editorManager, npcManager),
+                    this
+            );
 
             getServer().getPluginManager().registerEvents(
                     new PlayerJoinListener(npcManager), this

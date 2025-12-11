@@ -6,12 +6,14 @@ import com.comphenix.protocol.events.PacketContainer;
 import com.comphenix.protocol.wrappers.*;
 import com.yourserver.npc.NPCPlugin;
 import com.yourserver.npc.model.NPC;
+import com.yourserver.npc.model.NPCEquipment;
 import com.yourserver.npc.storage.NPCStorage;
 import com.yourserver.npc.util.SkinFetcher;
 import org.bukkit.Bukkit;
 import org.bukkit.Location;
 import org.bukkit.entity.EntityType;
 import org.bukkit.entity.Player;
+import org.bukkit.inventory.ItemStack;
 import org.joml.Vector3f;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -146,6 +148,48 @@ public class NPCManager {
 
         // Save to storage
         storage.saveNPCs(new ArrayList<>(npcs.values()));
+    }
+
+    private void sendEquipmentPacket(@NotNull Player player, @NotNull NPC npc) {
+        if (!npc.getEquipment().hasEquipment()) {
+            return;
+        }
+
+        try {
+            PacketContainer packet = protocolManager.createPacket(
+                    PacketType.Play.Server.ENTITY_EQUIPMENT
+            );
+
+            packet.getIntegers().write(0, npc.getEntityId());
+
+            List<Pair<EnumWrappers.ItemSlot, ItemStack>> equipment = new ArrayList<>();
+            NPCEquipment eq = npc.getEquipment();
+
+            if (eq.getMainHand() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.MAINHAND, eq.getMainHand()));
+            }
+            if (eq.getOffHand() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.OFFHAND, eq.getOffHand()));
+            }
+            if (eq.getHelmet() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.HEAD, eq.getHelmet()));
+            }
+            if (eq.getChestplate() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.CHEST, eq.getChestplate()));
+            }
+            if (eq.getLeggings() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.LEGS, eq.getLeggings()));
+            }
+            if (eq.getBoots() != null) {
+                equipment.add(new Pair<>(EnumWrappers.ItemSlot.FEET, eq.getBoots()));
+            }
+
+            packet.getSlotStackPairLists().write(0, equipment);
+            protocolManager.sendServerPacket(player, packet);
+
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to send equipment: " + e.getMessage());
+        }
     }
 
     /**

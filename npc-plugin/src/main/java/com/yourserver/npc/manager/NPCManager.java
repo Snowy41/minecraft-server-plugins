@@ -20,6 +20,8 @@ import org.bukkit.scheduler.BukkitTask;
 import org.joml.Vector3f;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import com.comphenix.protocol.wrappers.WrappedDataValue;
+import com.comphenix.protocol.wrappers.Vector3F;
 
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
@@ -150,8 +152,16 @@ public class NPCManager {
         }
     }
 
+
     /**
-     * Updates NPC pose and refreshes for all players.
+     * Updates NPC head/body rotation (player entities only support this, not full poses).
+     *
+     * Player entities can only rotate:
+     * - Head yaw (left/right look)
+     * - Head pitch (up/down look)
+     * - Body yaw (body direction)
+     *
+     * They CANNOT rotate individual arms/legs like armor stands.
      */
     public void updateNPCPose(@NotNull String id, @NotNull NPC.NPCPose pose) {
         NPC npc = registry.getNPC(id);
@@ -159,12 +169,11 @@ public class NPCManager {
 
         npc.setPose(pose);
 
-        // Refresh NPC for all players
+        // Send head/body rotation to all players
         for (Player player : Bukkit.getOnlinePlayers()) {
-            sendEntityMetadataPacket(player, npc);
+            updateNPCRotation(player, npc);
         }
 
-        refreshNPCForAllPlayers(npc);
         saveAllNPCs();
     }
 
@@ -172,14 +181,58 @@ public class NPCManager {
      * Updates NPC pose (overload accepting NPC directly).
      */
     public void updateNPCPose(@NotNull NPC npc) {
-        // Refresh NPC for all players
         for (Player player : Bukkit.getOnlinePlayers()) {
-            sendEntityMetadataPacket(player, npc);
+            updateNPCRotation(player, npc);
         }
-
-        refreshNPCForAllPlayers(npc);
         saveAllNPCs();
     }
+
+
+    /**
+     * Sends rotation packets to make NPC look in a direction.
+     * This is what player entities actually support.
+     */
+    private void updateNPCRotation(@NotNull Player player, @NotNull NPC npc) {
+        try {
+            NPC.NPCPose pose = npc.getPose();
+
+            // Get head yaw/pitch from pose
+            float headYaw = pose.getHeadYaw();
+            float headPitch = pose.getHeadPitch();
+            float bodyYaw = pose.getBodyYaw();
+
+            // Convert to Minecraft's byte format (256 units = 360 degrees)
+            byte headYawByte = (byte) ((headYaw * 256.0F) / 360.0F);
+            byte headPitchByte = (byte) ((headPitch * 256.0F) / 360.0F);
+            byte bodyYawByte = (byte) ((bodyYaw * 256.0F) / 360.0F);
+
+            // 1. Send entity head rotation (head yaw only)
+            PacketContainer headRotation = protocolManager.createPacket(
+                    PacketType.Play.Server.ENTITY_HEAD_ROTATION
+            );
+            headRotation.getIntegers().write(0, npc.getEntityId());
+            headRotation.getBytes().write(0, headYawByte);
+            protocolManager.sendServerPacket(player, headRotation);
+
+            // 2. Send entity look (head pitch + body yaw)
+            PacketContainer entityLook = protocolManager.createPacket(
+                    PacketType.Play.Server.ENTITY_LOOK
+            );
+            entityLook.getIntegers().write(0, npc.getEntityId());
+            entityLook.getBytes().write(0, bodyYawByte);  // Body yaw
+            entityLook.getBytes().write(1, headPitchByte); // Head pitch
+            entityLook.getBooleans().write(0, true); // On ground
+            protocolManager.sendServerPacket(player, entityLook);
+
+            plugin.getLogger().fine("Updated NPC rotation: " + npc.getId() +
+                    " (yaw=" + headYaw + ", pitch=" + headPitch + ")");
+
+        } catch (Exception e) {
+            plugin.getLogger().warning("Failed to update NPC rotation: " + e.getMessage());
+        }
+    }
+
+
 
     /**
      * Updates NPC equipment and refreshes visually.
@@ -262,6 +315,43 @@ public class NPCManager {
         }
     }
 
+
+    /**
+     * Makes NPC look at a specific location.
+     */
+    public void makeNPCLookAt(@NotNull String id, @NotNull Location target) {
+        NPC npc = registry.getNPC(id);
+        if (npc == null) return;
+
+        Location npcLoc = npc.getLocation();
+
+        // Calculate direction vector
+        double dx = target.getX() - npcLoc.getX();
+        double dy = target.getY() - npcLoc.getY();
+        double dz = target.getZ() - npcLoc.getZ();
+
+        // Calculate horizontal distance
+        double horizontalDistance = Math.sqrt(dx * dx + dz * dz);
+
+        // Calculate yaw (horizontal rotation)
+        // atan2(-dx, dz) gives correct yaw for Minecraft's coordinate system
+        float yaw = (float) Math.toDegrees(Math.atan2(-dx, dz));
+
+        // Calculate pitch (vertical rotation)
+        // FIXED: Use positive dy for looking up (negative pitch in Minecraft)
+        float pitch = (float) -Math.toDegrees(Math.atan2(dy, horizontalDistance));
+
+        // Update pose
+        NPC.NPCPose pose = npc.getPose();
+        pose.setHeadYaw(yaw);
+        pose.setHeadPitch(pitch);
+        pose.setBodyYaw(yaw); // Body follows head
+
+        updateNPCPose(npc);
+
+        plugin.getLogger().fine("NPC " + id + " looking at target (yaw=" + yaw + ", pitch=" + pitch + ")");
+    }
+
     /**
      * Makes an NPC look at a player.
      */
@@ -273,7 +363,9 @@ public class NPCManager {
     }
 
     public void makeNPCLookAtPlayer(@NotNull NPC npc, @NotNull Player target) {
-        // Make NPC look at the target for all online players
+        // Make NPC look at the target player's eye location (not feet)
+        Location eyeLocation = target.getEyeLocation();
+
         for (Player viewer : Bukkit.getOnlinePlayers()) {
             lookHandler.lookAtPlayer(npc, viewer, target);
         }
@@ -541,64 +633,66 @@ public class NPCManager {
 
     /**
      * Sends entity metadata packet with pose and second skin layer.
+     * Uses reflection to create proper NMS Rotations objects.
      */
     private void sendEntityMetadataPacket(@NotNull Player player, @NotNull NPC npc) {
         try {
             PacketContainer packet = protocolManager.createPacket(ENTITY_METADATA);
             packet.getIntegers().write(0, npc.getEntityId());
 
-            WrappedDataWatcher watcher = new WrappedDataWatcher();
+            List<WrappedDataValue> metadata = new ArrayList<>();
 
             // Index 17: Skin layers (byte)
+            // Bit mask: Cape | Jacket | Left Sleeve | Right Sleeve | Left Pants | Right Pants | Hat
+            // 0x7F = 0111 1111 = All layers visible
+            // 0x00 = 0000 0000 = No second layer (only base skin)
             byte skinLayers = npc.getPose().isShowSecondLayer() ? (byte) 0x7F : (byte) 0x00;
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(17,
-                    WrappedDataWatcher.Registry.get(Byte.class)), skinLayers);
+            metadata.add(new WrappedDataValue(17,
+                    WrappedDataWatcher.Registry.get(Byte.class),
+                    skinLayers));
 
-            // Pose data (indices 18-23 for 1.21.8)
-            NPC.NPCPose pose = npc.getPose();
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(18,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getHeadPitch(), pose.getHeadYaw(), pose.getHeadRoll()));
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(19,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getBodyPitch(), pose.getBodyYaw(), pose.getBodyRoll()));
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(20,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getLeftArmPitch(), pose.getLeftArmYaw(), pose.getLeftArmRoll()));
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(21,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getRightArmPitch(), pose.getRightArmYaw(), pose.getRightArmRoll()));
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(22,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getLeftLegPitch(), pose.getLeftLegYaw(), pose.getLeftLegRoll()));
-
-            watcher.setObject(new WrappedDataWatcher.WrappedDataWatcherObject(23,
-                            WrappedDataWatcher.Registry.getVectorSerializer()),
-                    createRotationVector(pose.getRightLegPitch(), pose.getRightLegYaw(), pose.getRightLegRoll()));
-
-            packet.getWatchableCollectionModifier().write(0, watcher.getWatchableObjects());
+            // Write to packet
+            packet.getDataValueCollectionModifier().write(0, metadata);
             protocolManager.sendServerPacket(player, packet);
 
+            plugin.getLogger().fine("Sent metadata for NPC " + npc.getId() + " (skin layers: " +
+                    (npc.getPose().isShowSecondLayer() ? "ON" : "OFF") + ")");
+
         } catch (Exception e) {
-            plugin.getLogger().severe("Failed to send metadata: " + e.getMessage());
+            plugin.getLogger().severe("Failed to send metadata for NPC " + npc.getId() + ": " + e.getMessage());
             e.printStackTrace();
         }
     }
 
     /**
-     * Creates a rotation vector for entity metadata.
+     * Creates NMS Rotations object using reflection.
+     * This is necessary because we can't directly reference NMS classes.
      */
-    private Vector3f createRotationVector(float pitch, float yaw, float roll) {
-        return new Vector3f(
-                (float) Math.toRadians(pitch),
-                (float) Math.toRadians(yaw),
-                (float) Math.toRadians(roll)
-        );
+    private Object createNMSRotations(float x, float y, float z) {
+        try {
+            // Get the NMS Rotations class
+            Class<?> rotationsClass = Class.forName("net.minecraft.core.Rotations");
+
+            // Create new instance: new Rotations(x, y, z)
+            return rotationsClass.getConstructor(float.class, float.class, float.class)
+                    .newInstance(x, y, z);
+
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to create Rotations object: " + e.getMessage());
+            e.printStackTrace();
+
+            // Fallback: return Vector3F and hope ProtocolLib converts it
+            return new com.comphenix.protocol.wrappers.Vector3F(x, y, z);
+        }
+    }
+
+    /**
+     * Creates a rotation vector for entity metadata.
+     * FIXED: Returns ProtocolLib's Vector3F with degrees (pose already in degrees)
+     */
+    private Vector3F createRotationVector(float pitch, float yaw, float roll) {
+        // Pose values are already in degrees, so just pass them directly
+        return new Vector3F(pitch, yaw, roll);
     }
 
     /**
@@ -607,6 +701,11 @@ public class NPCManager {
     private void spawnHologramForPlayer(@NotNull Player player, @NotNull NPC npc) {
         Location baseLoc = npc.getLocation().clone().add(0, 2.3, 0);
         List<Integer> hologramIds = new ArrayList<>();
+
+        if (npc.getLocation().getWorld() == null) {
+            plugin.getLogger().warning("NPC world is null: " + npc.getId());
+            return;
+        }
 
         for (int i = 0; i < npc.getHologramLines().size(); i++) {
             String line = npc.getHologramLines().get(i);

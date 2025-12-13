@@ -231,77 +231,49 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         NPC.NPCPose pose = npc.getPose();
 
-        // Apply adjustment based on part and axis
+        // IMPORTANT: Player entities only support head/body rotation
+        // Arms and legs cannot be posed like armor stands
         switch (part) {
             case "head" -> {
                 switch (axis) {
                     case "pitch" -> pose.setHeadPitch(degrees);
                     case "yaw" -> pose.setHeadYaw(degrees);
-                    case "roll" -> pose.setHeadRoll(degrees);
+                    case "roll" -> {
+                        player.sendMessage(Component.text("⚠ Head roll is not supported for player NPCs!",
+                                NamedTextColor.YELLOW));
+                        return;
+                    }
                     default -> {
-                        player.sendMessage(Component.text("Invalid axis! Use: pitch, yaw, roll", NamedTextColor.RED));
+                        player.sendMessage(Component.text("Invalid axis! Use: pitch, yaw", NamedTextColor.RED));
                         return;
                     }
                 }
             }
             case "body" -> {
                 switch (axis) {
-                    case "pitch" -> pose.setBodyPitch(degrees);
                     case "yaw" -> pose.setBodyYaw(degrees);
-                    case "roll" -> pose.setBodyRoll(degrees);
+                    case "pitch", "roll" -> {
+                        player.sendMessage(Component.text("⚠ Only body yaw is supported for player NPCs!",
+                                NamedTextColor.YELLOW));
+                        return;
+                    }
                     default -> {
-                        player.sendMessage(Component.text("Invalid axis!", NamedTextColor.RED));
+                        player.sendMessage(Component.text("Invalid axis! Use: yaw", NamedTextColor.RED));
                         return;
                     }
                 }
             }
-            case "rightarm" -> {
-                switch (axis) {
-                    case "pitch" -> pose.setRightArmPitch(degrees);
-                    case "yaw" -> pose.setRightArmYaw(degrees);
-                    case "roll" -> pose.setRightArmRoll(degrees);
-                    default -> {
-                        player.sendMessage(Component.text("Invalid axis!", NamedTextColor.RED));
-                        return;
-                    }
-                }
-            }
-            case "leftarm" -> {
-                switch (axis) {
-                    case "pitch" -> pose.setLeftArmPitch(degrees);
-                    case "yaw" -> pose.setLeftArmYaw(degrees);
-                    case "roll" -> pose.setLeftArmRoll(degrees);
-                    default -> {
-                        player.sendMessage(Component.text("Invalid axis!", NamedTextColor.RED));
-                        return;
-                    }
-                }
-            }
-            case "rightleg" -> {
-                switch (axis) {
-                    case "pitch" -> pose.setRightLegPitch(degrees);
-                    case "yaw" -> pose.setRightLegYaw(degrees);
-                    case "roll" -> pose.setRightLegRoll(degrees);
-                    default -> {
-                        player.sendMessage(Component.text("Invalid axis!", NamedTextColor.RED));
-                        return;
-                    }
-                }
-            }
-            case "leftleg" -> {
-                switch (axis) {
-                    case "pitch" -> pose.setLeftLegPitch(degrees);
-                    case "yaw" -> pose.setLeftLegYaw(degrees);
-                    case "roll" -> pose.setLeftLegRoll(degrees);
-                    default -> {
-                        player.sendMessage(Component.text("Invalid axis!", NamedTextColor.RED));
-                        return;
-                    }
-                }
+            case "rightarm", "leftarm", "rightleg", "leftleg" -> {
+                player.sendMessage(Component.text("⚠ Arm/leg poses are not supported for player NPCs!",
+                        NamedTextColor.YELLOW));
+                player.sendMessage(Component.text("Player entities can only rotate head and body.",
+                        NamedTextColor.GRAY));
+                player.sendMessage(Component.text("Use armor stands for full pose control.",
+                        NamedTextColor.GRAY));
+                return;
             }
             default -> {
-                player.sendMessage(Component.text("Invalid part! Use: head, body, rightarm, leftarm, rightleg, leftleg",
-                        NamedTextColor.RED));
+                player.sendMessage(Component.text("Invalid part! Use: head, body", NamedTextColor.RED));
                 return;
             }
         }
@@ -316,7 +288,9 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
     private void handlePose(CommandSender sender, String[] args) {
         if (args.length < 3) {
             sender.sendMessage(Component.text("Usage: /npc pose <id> <preset>", NamedTextColor.RED));
-            sender.sendMessage(Component.text("Presets: standing, sitting, waving, pointing, saluting, dabbing",
+            sender.sendMessage(Component.text("⚠ Note: Player NPCs only support head/body rotation",
+                    NamedTextColor.YELLOW));
+            sender.sendMessage(Component.text("Presets: standing, lookingleft, lookingright, lookingup, lookingdown",
                     NamedTextColor.GRAY));
             return;
         }
@@ -332,16 +306,35 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
 
         NPC.NPCPose pose = switch (preset) {
             case "standing" -> NPC.NPCPose.standing();
-            case "sitting" -> NPC.NPCPose.sitting();
-            case "waving" -> NPC.NPCPose.waving();
-            case "pointing" -> NPC.NPCPose.pointing();
-            case "saluting" -> NPC.NPCPose.saluting();
-            case "dabbing" -> NPC.NPCPose.dabbing();
+            case "lookingleft" -> {
+                NPC.NPCPose p = new NPC.NPCPose();
+                p.setHeadYaw(-90f);
+                p.setBodyYaw(-45f);
+                yield p;
+            }
+            case "lookingright" -> {
+                NPC.NPCPose p = new NPC.NPCPose();
+                p.setHeadYaw(90f);
+                p.setBodyYaw(45f);
+                yield p;
+            }
+            case "lookingup" -> {
+                NPC.NPCPose p = new NPC.NPCPose();
+                p.setHeadPitch(-45f);
+                yield p;
+            }
+            case "lookingdown" -> {
+                NPC.NPCPose p = new NPC.NPCPose();
+                p.setHeadPitch(45f);
+                yield p;
+            }
             default -> null;
         };
 
         if (pose == null) {
             sender.sendMessage(Component.text("Invalid preset!", NamedTextColor.RED));
+            sender.sendMessage(Component.text("⚠ Old presets (waving, sitting, etc.) don't work with player NPCs",
+                    NamedTextColor.YELLOW));
             return;
         }
 
@@ -511,8 +504,10 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
                 .append(Component.text(" - List all NPCs", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/npc edit <id>", NamedTextColor.WHITE)
                 .append(Component.text(" - Enter editor mode", NamedTextColor.GRAY)));
-        sender.sendMessage(Component.text("/npc pose <id> <preset>", NamedTextColor.WHITE)
-                .append(Component.text(" - Apply preset pose", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/npc look <id>", NamedTextColor.WHITE)
+                .append(Component.text(" - Make NPC look at you", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.text("/npc autolook <id> <on|off>", NamedTextColor.WHITE)
+                .append(Component.text(" - Auto-track players", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/npc move <id>", NamedTextColor.WHITE)
                 .append(Component.text(" - Move NPC to you", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/npc action <id> <type> <data>", NamedTextColor.WHITE)
@@ -520,7 +515,12 @@ public class NPCCommand implements CommandExecutor, TabCompleter {
         sender.sendMessage(Component.text("/npc hologram <id> add <line>", NamedTextColor.WHITE)
                 .append(Component.text(" - Add hologram", NamedTextColor.GRAY)));
         sender.sendMessage(Component.text("/npc equip <id> <slot>", NamedTextColor.WHITE)
-                .append(Component.text(" - Equip item (hold item)", NamedTextColor.GRAY)));
+                .append(Component.text(" - Equip item", NamedTextColor.GRAY)));
+        sender.sendMessage(Component.empty());
+        sender.sendMessage(Component.text("⚠ Note: Player NPCs only support head/body rotation",
+                NamedTextColor.YELLOW));
+        sender.sendMessage(Component.text("   For full poses, use armor stand NPCs",
+                NamedTextColor.GRAY));
         sender.sendMessage(Component.empty());
     }
 

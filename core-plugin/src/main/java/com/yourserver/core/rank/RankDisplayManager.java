@@ -112,14 +112,15 @@ public class RankDisplayManager {
 
     /**
      * Get formatted rank display: [ICON] RankName
+     * Returns MiniMessage format (safe for scoreboard/tab)
      */
     @NotNull
     public String getRankDisplay(@NotNull Player player) {
         RankData rank = getPlayerRank(player);
         if (rank == null) {
-            return "§7" + player.getName();
+            return "<gray>" + player.getName();
         }
-        return rank.unicodeChar + " " + rank.colorCode + rank.displayName;
+        return rank.unicodeChar + " " + convertColorCode(rank.colorCode) + rank.displayName;
     }
 
     /**
@@ -129,9 +130,35 @@ public class RankDisplayManager {
     public String getFormattedPlayerName(@NotNull Player player) {
         RankData rank = getPlayerRank(player);
         if (rank == null) {
-            return "§7" + player.getName();
+            return "<gray>" + player.getName();
         }
-        return rank.unicodeChar + " " + rank.colorCode + player.getName();
+        return rank.unicodeChar + " " + convertColorCode(rank.colorCode) + player.getName();
+    }
+
+    /**
+     * Converts legacy color code to MiniMessage format.
+     * Example: §c -> <red>, §7 -> <gray>
+     */
+    private String convertColorCode(String legacyCode) {
+        return switch (legacyCode) {
+            case "§0" -> "<black>";
+            case "§1" -> "<dark_blue>";
+            case "§2" -> "<dark_green>";
+            case "§3" -> "<dark_aqua>";
+            case "§4" -> "<dark_red>";
+            case "§5" -> "<dark_purple>";
+            case "§6" -> "<gold>";
+            case "§7" -> "<gray>";
+            case "§8" -> "<dark_gray>";
+            case "§9" -> "<blue>";
+            case "§a" -> "<green>";
+            case "§b" -> "<aqua>";
+            case "§c" -> "<red>";
+            case "§d" -> "<light_purple>";
+            case "§e" -> "<yellow>";
+            case "§f" -> "<white>";
+            default -> "<white>";
+        };
     }
 
     /**

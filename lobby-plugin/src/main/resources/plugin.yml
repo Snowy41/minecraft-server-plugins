@@ -30,6 +30,12 @@ commands:
     permission: lobby.spawn
     aliases: [s]
 
+  refreshnametags:
+    description: Refresh all player nametags and tab names
+    usage: /<command>
+    permission: lobby.admin
+    aliases: [ rnt, refreshnames ]
+
 permissions:
   lobby.admin:
     description: Access to lobby admin commands

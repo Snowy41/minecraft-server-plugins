@@ -115,7 +115,7 @@ public class ScoreboardManager {
      * Gets the player's rank with icon from RankDisplayManager.
      *
      * @param player The player
-     * @return The rank display with icon
+     * @return The rank display with icon (MiniMessage format)
      */
     private String getRank(Player player) {
         // Get rank display manager from CorePlugin
@@ -123,10 +123,10 @@ public class ScoreboardManager {
 
         if (rankManager == null) {
             // Fallback if RankDisplayManager not available
-            return player.isOp() ? "Admin" : "Member";
+            return player.isOp() ? "<red>Admin" : "<gray>Member";
         }
 
-        // Get formatted rank with icon
+        // Get formatted rank with icon (already in MiniMessage format now!)
         return rankManager.getRankDisplay(player);
     }
 

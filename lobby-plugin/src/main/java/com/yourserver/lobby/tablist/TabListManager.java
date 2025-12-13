@@ -54,9 +54,12 @@ public class TabListManager {
         var rankManager = corePlugin.getRankDisplayManager();
         if (rankManager == null) return;
 
-        // Set tab list name with rank icon
+        // Get formatted name with rank icon (MiniMessage format)
         String formattedName = rankManager.getFormattedPlayerName(player);
-        player.setPlayerListName(formattedName);
+
+        // Convert to Component and set
+        Component nameComponent = miniMessage.deserialize(formattedName);
+        player.playerListName(nameComponent);
     }
 
     /**

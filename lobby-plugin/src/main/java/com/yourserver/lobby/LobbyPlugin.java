@@ -49,6 +49,7 @@ public class LobbyPlugin extends JavaPlugin {
     private CosmeticsManager cosmeticsManager;
     private ItemToggleManager itemToggleManager;
     private TimeManager timeManager;
+    private com.yourserver.lobby.listener.RankDisplayListener rankDisplayListener;
 
     @Override
     public void onLoad() {
@@ -108,11 +109,16 @@ public class LobbyPlugin extends JavaPlugin {
                     this
             );
             getServer().getPluginManager().registerEvents(guiManager, this);
+
+            // Register rank display listener for nametags and tab list
+            rankDisplayListener = new com.yourserver.lobby.listener.RankDisplayListener(corePlugin);
+            getServer().getPluginManager().registerEvents(rankDisplayListener, this);
             getLogger().info("Event listeners registered");
 
             // 6. Register commands
             getCommand("lobby").setExecutor(new LobbyCommand(this, spawnManager));
             getCommand("spawn").setExecutor(new SpawnCommand(this, spawnManager));
+            getCommand("refreshnametags").setExecutor(new com.yourserver.lobby.command.RefreshNametagsCommand(this));
             getLogger().info("Commands registered");
 
             // 7. Start update tasks
@@ -257,6 +263,16 @@ public class LobbyPlugin extends JavaPlugin {
 
     public TimeManager getTimeManager() {
         return timeManager;
+    }
+
+    /**
+     * Refreshes a player's display (nametag and tab list).
+     * Used by RefreshNametagsCommand.
+     */
+    public void refreshPlayerDisplay(Player player) {
+        if (rankDisplayListener != null) {
+            rankDisplayListener.updatePlayerDisplay(player);
+        }
     }
 
     /**

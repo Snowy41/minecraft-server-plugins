@@ -1,27 +1,19 @@
 # MySQL Database Configuration
+# MySQL Database Configuration
 mysql:
-  # Database connection settings
-  host: "sql7.freesqldatabase.com"
-  port: 3306
-  database: "sql7811191"
-  username: "sql7811191"
-  password: "8vNiLJzIvs"
+  # Railway MySQL connection (SAME as LuckPerms!)
+  host: "yamabiko.proxy.rlwy.net"
+  port: 35834
+  database: "railway"
+  username: "root"
+  password: "hECALfMctdYillfDoVsaVDDismxZnMm"
 
   # Connection pool settings (HikariCP)
   pool:
-    # Maximum number of connections in the pool
     maximum-pool-size: 10
-
-    # Minimum number of idle connections
     minimum-idle: 2
-
-    # Maximum time (ms) to wait for a connection
     connection-timeout: 30000
-
-    # Maximum time (ms) a connection can be idle
     idle-timeout: 600000
-
-    # Maximum lifetime (ms) of a connection in the pool
     max-lifetime: 1800000
 
   # Connection properties for performance
@@ -37,23 +29,19 @@ mysql:
     elideSetAutoCommits: true
     maintainTimeStats: false
 
-# Redis Configuration
+# Redis Configuration (no change needed)
 redis:
-  # Redis connection settings - UPDATED FOR REDIS CLOUD
   host: "redis-13511.crce218.eu-central-1-1.ec2.cloud.redislabs.com"
   port: 13511
   password: "TUdVa4lhKdpQDIiI5ynKrb3ylzllqmmp"
 
-  # Connection pool settings (Lettuce)
   pool:
     max-total: 20
     max-idle: 10
     min-idle: 2
 
-  # Key prefix for this server network
   key-prefix: "mcserver:"
 
-  # Pub/Sub channels
   channels:
     server-heartbeat: "server:heartbeat"
     game-state: "game:state"

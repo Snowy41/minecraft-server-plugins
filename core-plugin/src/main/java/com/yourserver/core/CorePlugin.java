@@ -60,12 +60,11 @@ public class CorePlugin extends JavaPlugin {
             redisManager.initialize(databaseConfig.getRedisConfig());
             getLogger().info("Redis connection established");
 
-            rankDisplayManager = new RankDisplayManager(getLogger());
-
             // 5. Initialize player data manager
             playerDataManager = new PlayerDataManager(playerDataRepo, playerStatsRepo);
             getLogger().info("Player data manager initialized");
             buildModeManager = new BuildModeManager();
+            rankDisplayManager = new RankDisplayManager(getLogger());
 
             // 6. Register listeners
             getServer().getPluginManager().registerEvents(

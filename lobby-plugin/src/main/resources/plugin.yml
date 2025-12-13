@@ -12,6 +12,7 @@ depend:
 # Soft dependencies (optional)
 softdepend:
   - NPCPlugin
+  - LuckPerms
 
 # Load order
 load: POSTWORLD

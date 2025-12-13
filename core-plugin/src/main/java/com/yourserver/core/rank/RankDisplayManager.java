@@ -2,6 +2,7 @@ package com.yourserver.core.rank;
 
 import net.luckperms.api.LuckPerms;
 import net.luckperms.api.model.user.User;
+import net.luckperms.api.node.NodeType;
 import net.luckperms.api.node.types.InheritanceNode;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
@@ -20,21 +21,27 @@ import java.util.logging.Logger;
 public class RankDisplayManager {
 
     private final Logger logger;
-    private final LuckPerms luckPerms;
+    private LuckPerms luckPerms;
     private final Map<String, RankData> rankMappings;
 
     public RankDisplayManager(Logger logger) {
         this.logger = logger;
 
         // Initialize LuckPerms API
-        RegisteredServiceProvider<LuckPerms> provider =
-                Bukkit.getServicesManager().getRegistration(LuckPerms.class);
+        try {
+            RegisteredServiceProvider<LuckPerms> provider =
+                    Bukkit.getServicesManager().getRegistration(LuckPerms.class);
 
-        if (provider != null) {
-            this.luckPerms = provider.getProvider();
-            logger.info("LuckPerms API hooked successfully");
-        } else {
-            throw new IllegalStateException("LuckPerms not found! Please install LuckPerms.");
+            if (provider != null) {
+                this.luckPerms = provider.getProvider();
+                logger.info("LuckPerms API hooked successfully");
+            } else {
+                logger.warning("LuckPerms not found! Rank icons will not work.");
+                this.luckPerms = null;
+            }
+        } catch (Exception e) {
+            logger.warning("Failed to hook LuckPerms: " + e.getMessage());
+            this.luckPerms = null;
         }
 
         // Initialize rank mappings
@@ -72,24 +79,35 @@ public class RankDisplayManager {
      */
     @Nullable
     public RankData getPlayerRank(@NotNull Player player) {
-        User user = luckPerms.getUserManager().getUser(player.getUniqueId());
-        if (user == null) return null;
-
-        RankData highestRank = null;
-        int highestPriority = -1;
-
-        // Get all groups the player inherits from
-        for (InheritanceNode node : user.getNodes(InheritanceNode.class)) {
-            String groupName = node.getGroupName().toLowerCase();
-            RankData rankData = rankMappings.get(groupName);
-
-            if (rankData != null && rankData.priority > highestPriority) {
-                highestRank = rankData;
-                highestPriority = rankData.priority;
-            }
+        if (luckPerms == null) {
+            return null;
         }
 
-        return highestRank;
+        try {
+            User user = luckPerms.getUserManager().getUser(player.getUniqueId());
+            if (user == null) {
+                return null;
+            }
+
+            RankData highestRank = null;
+            int highestPriority = -1;
+
+            // Get all inheritance nodes using NodeType.INHERITANCE
+            for (InheritanceNode node : user.getNodes(NodeType.INHERITANCE)) {
+                String groupName = node.getGroupName().toLowerCase();
+                RankData rankData = rankMappings.get(groupName);
+
+                if (rankData != null && rankData.priority > highestPriority) {
+                    highestRank = rankData;
+                    highestPriority = rankData.priority;
+                }
+            }
+
+            return highestRank;
+        } catch (Exception e) {
+            logger.warning("Error getting rank for " + player.getName() + ": " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -138,11 +156,22 @@ public class RankDisplayManager {
      * Check if player has a specific rank.
      */
     public boolean hasRank(@NotNull Player player, @NotNull String rankName) {
-        User user = luckPerms.getUserManager().getUser(player.getUniqueId());
-        if (user == null) return false;
+        if (luckPerms == null) {
+            return false;
+        }
 
-        return user.getNodes(InheritanceNode.class).stream()
-                .anyMatch(node -> node.getGroupName().equalsIgnoreCase(rankName));
+        try {
+            User user = luckPerms.getUserManager().getUser(player.getUniqueId());
+            if (user == null) {
+                return false;
+            }
+
+            return user.getNodes(NodeType.INHERITANCE).stream()
+                    .anyMatch(node -> node.getGroupName().equalsIgnoreCase(rankName));
+        } catch (Exception e) {
+            logger.warning("Error checking rank for " + player.getName() + ": " + e.getMessage());
+            return false;
+        }
     }
 
     /**

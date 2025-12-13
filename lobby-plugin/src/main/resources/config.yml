@@ -73,15 +73,20 @@ scoreboard:
   title: "<gradient:#FFD700:#FFA500><bold>YOUR SERVER</bold></gradient>"
 
   # Lines (supports MiniMessage and placeholders)
-  # Available placeholders: {player}, {online}, {max_players}, {rank}
+  # Available placeholders:
+  #   {player} - Player name
+  #   {rank} - Player rank with icon (from LuckPerms)
+  #   {online} - Online players in partition
+  #   {max_players} - Max players in partition
+  #   {partition} - Partition name
   lines:
     - ""
     - "<gray>Player: <white>{player}"
-    - "<gray>Rank: {rank}"
+    - "{rank}"  # This now shows rank icon + rank name!
     - ""
-    - "<yellow>Partition: {partition}"        # NEW! Shows partition name
-    - "<gray>Online: <green>{online}"         # Now partition-specific!
-    - "<gray>Max: <green>{max_players}"       # Now partition-specific!
+    - "<yellow>Partition: {partition}"
+    - "<gray>Online: <green>{online}"
+    - "<gray>Max: <green>{max_players}"
     - ""
     - "<yellow>play.yourserver.com"
     - ""

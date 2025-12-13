@@ -76,6 +76,21 @@ public class PlayerConnectionListener implements Listener {
             tabListManager.updatePlayer(player);
         }
 
+        // Set up tab list
+        if (plugin.getLobbyConfig().getTabListConfig().isEnabled()) {
+            tabListManager.updatePlayer(player);
+
+            // SET INITIAL TAB LIST NAME WITH RANK ICON
+            var corePlugin = plugin.getCorePlugin();
+            if (corePlugin != null) {
+                var rankManager = corePlugin.getRankDisplayManager();
+                if (rankManager != null) {
+                    String formattedName = rankManager.getFormattedPlayerName(player);
+                    player.setPlayerListName(formattedName);
+                }
+            }
+        }
+
         // Custom join message (optional)
         event.joinMessage(null); // Remove default join message
     }

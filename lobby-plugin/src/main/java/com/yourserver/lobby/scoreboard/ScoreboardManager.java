@@ -112,18 +112,22 @@ public class ScoreboardManager {
     }
 
     /**
-     * Gets the player's rank (from LuckPerms if available).
+     * Gets the player's rank with icon from RankDisplayManager.
      *
      * @param player The player
-     * @return The rank name
+     * @return The rank display with icon
      */
     private String getRank(Player player) {
-        // Try to get rank from LuckPerms (if available)
-        // For now, return default
-        if (player.isOp()) {
-            return "Admin";
+        // Get rank display manager from CorePlugin
+        var rankManager = corePlugin.getRankDisplayManager();
+
+        if (rankManager == null) {
+            // Fallback if RankDisplayManager not available
+            return player.isOp() ? "Admin" : "Member";
         }
-        return "Member";
+
+        // Get formatted rank with icon
+        return rankManager.getRankDisplay(player);
     }
 
     /**

@@ -34,6 +34,29 @@ public class TabListManager {
         Component footer = parseLines(config.getTabListConfig().getFooter(), player);
 
         player.sendPlayerListHeaderAndFooter(header, footer);
+
+        // ALSO UPDATE TAB NAME WITH RANK ICON
+        updatePlayerTabName(player);
+    }
+
+    /**
+     * Updates a player's tab list name with rank icon.
+     *
+     * @param player The player
+     */
+    public void updatePlayerTabName(Player player) {
+        // Get rank display manager from CorePlugin
+        var corePlugin = (com.yourserver.core.CorePlugin)
+                plugin.getServer().getPluginManager().getPlugin("CorePlugin");
+
+        if (corePlugin == null) return;
+
+        var rankManager = corePlugin.getRankDisplayManager();
+        if (rankManager == null) return;
+
+        // Set tab list name with rank icon
+        String formattedName = rankManager.getFormattedPlayerName(player);
+        player.setPlayerListName(formattedName);
     }
 
     /**

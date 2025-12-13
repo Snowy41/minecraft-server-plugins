@@ -14,7 +14,6 @@ loadbefore:
 # Soft dependencies (plugins that can optionally be present)
 softdepend:
   - LuckPerms
-  - Vault
 
 commands:
   core:

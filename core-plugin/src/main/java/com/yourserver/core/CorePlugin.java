@@ -6,6 +6,7 @@ import com.yourserver.core.database.DatabaseManager;
 import com.yourserver.core.database.MySQLPlayerDataRepository;
 import com.yourserver.core.database.MySQLPlayerStatsRepository;
 import com.yourserver.core.player.PlayerDataManager;
+import com.yourserver.core.rank.RankDisplayManager;
 import com.yourserver.core.redis.RedisManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -25,6 +26,7 @@ public class CorePlugin extends JavaPlugin {
     private PlayerDataManager playerDataManager;
     private DatabaseConfig databaseConfig;
     private BuildModeManager buildModeManager;
+    private RankDisplayManager rankDisplayManager;
 
     @Override
     public void onLoad() {
@@ -57,6 +59,8 @@ public class CorePlugin extends JavaPlugin {
             redisManager = new RedisManager(getLogger());
             redisManager.initialize(databaseConfig.getRedisConfig());
             getLogger().info("Redis connection established");
+
+            rankDisplayManager = new RankDisplayManager(getLogger());
 
             // 5. Initialize player data manager
             playerDataManager = new PlayerDataManager(playerDataRepo, playerStatsRepo);
@@ -144,4 +148,5 @@ public class CorePlugin extends JavaPlugin {
         return buildModeManager;
     }
 
+    public RankDisplayManager getRankDisplayManager() { return rankDisplayManager; }
 }

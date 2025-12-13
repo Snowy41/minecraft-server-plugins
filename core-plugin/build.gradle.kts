@@ -15,7 +15,7 @@ dependencies {
     implementation(project(":api-module"))
 
     // Paper API
-    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
+    compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     compileOnly("net.luckperms:api:5.4")
 
     // Adventure API (modern text components)

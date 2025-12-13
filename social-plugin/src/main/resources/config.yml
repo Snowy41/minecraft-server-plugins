@@ -1,0 +1,145 @@
+# Social Plugin Configuration
+# Version: 1.0.0
+
+# Friend System
+friends:
+  enabled: true
+  max-friends: 50
+
+  # Friend request settings
+  requests:
+    expire-after: 300 # seconds (5 minutes)
+    notify-on-join: true
+
+  # Notifications
+  notifications:
+    on-join: true
+    on-leave: true
+    on-server-change: true
+
+# Party System
+parties:
+  enabled: true
+  max-members: 8
+
+  # Party settings
+  allow-public: false # Can create open parties
+  leader-only-invite: true
+  leader-only-kick: true
+  leader-only-warp: true
+
+  # Party invites
+  invites:
+    expire-after: 60 # seconds (1 minute)
+
+  # Auto-disband
+  disband-on-leader-leave: true
+  disband-when-empty: true
+
+# Clan System
+clans:
+  enabled: true
+  max-members: 50
+
+  # Clan creation
+  creation:
+    min-name-length: 3
+    max-name-length: 16
+    min-tag-length: 2
+    max-tag-length: 6
+    cost: 0 # economy cost (if enabled)
+
+  # Clan ranks
+  ranks:
+    owner:
+      name: "Owner"
+      color: "<gold>"
+      permissions:
+        - "*" # All permissions
+
+    admin:
+      name: "Admin"
+      color: "<red>"
+      permissions:
+        - "invite"
+        - "kick"
+        - "promote"
+        - "chat"
+
+    member:
+      name: "Member"
+      color: "<gray>"
+      permissions:
+        - "chat"
+
+  # Clan chat
+  chat:
+    format: "<dark_gray>[<green>CLAN<dark_gray>] {rank_color}{player}<dark_gray>: <white>{message}"
+    prefix: "!"
+    cross-server: true
+
+# Messages (supports MiniMessage format)
+messages:
+  prefix: "<gradient:#4169E1:#1E90FF>[Social]</gradient> "
+
+  # Friends
+  friend-request-sent: "<green>Friend request sent to <white>{player}"
+  friend-request-received: "<yellow>{player} <green>wants to be your friend! <click:run_command:/friend accept {player}>[Accept]</click> <click:run_command:/friend deny {player}>[Deny]</click>"
+  friend-added: "<green>You are now friends with <white>{player}"
+  friend-removed: "<red>Removed <white>{player} <red>from friends"
+  friend-online: "<green>✓ <white>{player} <gray>is now online on <yellow>{server}"
+  friend-offline: "<red>✗ <white>{player} <gray>is now offline"
+  friend-already-added: "<red>{player} is already your friend!"
+  friend-request-expired: "<red>Friend request expired!"
+  max-friends-reached: "<red>You have reached the maximum number of friends! <gray>({max})"
+
+  # Parties
+  party-created: "<green>Party created! Invite friends with <white>/party invite <player>"
+  party-invite-sent: "<green>Invited <white>{player} <green>to the party"
+  party-invite-received: "<yellow>{player} <green>invited you to their party! <click:run_command:/party accept {player}>[Accept]</click> <click:run_command:/party deny {player}>[Deny]</click>"
+  party-joined: "<green>{player} joined the party!"
+  party-left: "<red>{player} left the party"
+  party-disbanded: "<red>Party disbanded!"
+  party-kicked: "<red>You were kicked from the party!"
+  party-not-in-party: "<red>You're not in a party!"
+  party-not-leader: "<red>Only the party leader can do this!"
+  party-full: "<red>Party is full! <gray>(Max: {max})"
+  party-warp-starting: "<yellow>Warping party to <white>{server}<yellow>..."
+
+  # Clans
+  clan-created: "<green>Clan <white>{name} <green>created! Tag: <white>[{tag}]"
+  clan-invite-sent: "<green>Invited <white>{player} <green>to the clan"
+  clan-invite-received: "<yellow>{player} <green>invited you to clan <white>{name}<green>! <click:run_command:/clan accept {name}>[Accept]</click> <click:run_command:/clan deny {name}>[Deny]</click>"
+  clan-joined: "<green>{player} joined the clan!"
+  clan-left: "<red>{player} left the clan"
+  clan-kicked: "<red>You were kicked from the clan!"
+  clan-disbanded: "<red>Clan disbanded!"
+  clan-name-taken: "<red>Clan name already taken!"
+  clan-tag-taken: "<red>Clan tag already taken!"
+  clan-full: "<red>Clan is full! <gray>(Max: {max})"
+  clan-not-in-clan: "<red>You're not in a clan!"
+  clan-no-permission: "<red>You don't have permission to do this!"
+
+  # Errors
+  player-not-found: "<red>Player not found!"
+  player-not-online: "<red>{player} is not online!"
+  cannot-add-self: "<red>You cannot add yourself!"
+  already-in-party: "<red>You're already in a party!"
+  already-in-clan: "<red>You're already in a clan!"
+  no-pending-requests: "<red>No pending requests!"
+
+# GUI Settings
+gui:
+  enabled: true
+
+  friends-gui:
+    title: "<gradient:#4169E1:#1E90FF>Your Friends</gradient>"
+    size: 54 # 6 rows
+
+  party-gui:
+    title: "<gradient:#32CD32:#228B22>Party Management</gradient>"
+    size: 27 # 3 rows
+
+  clan-gui:
+    title: "<gradient:#FF4500:#DC143C>Clan Management</gradient>"
+    size: 54 # 6 rows

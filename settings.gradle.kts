@@ -4,7 +4,7 @@ include(
     "api-module",
     "core-plugin",
     "lobby-plugin",
-    "partition"
+    "partition",
     //"battleroyale-plugin",
     //"proxy-plugin"
 )
@@ -12,3 +12,5 @@ include(
 // Map the partition folder to PartitionPlugin module
 project(":partition").name = "PartitionPlugin"
 include("npc-plugin")
+include("social-plugin")
+include("social-plugin-velocity")

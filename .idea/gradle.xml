@@ -13,6 +13,8 @@
             <option value="$PROJECT_DIR$/lobby-plugin" />
             <option value="$PROJECT_DIR$/npc-plugin" />
             <option value="$PROJECT_DIR$/partition" />
+            <option value="$PROJECT_DIR$/social-plugin" />
+            <option value="$PROJECT_DIR$/social-plugin-velocity" />
           </set>
         </option>
       </GradleProjectSettings>

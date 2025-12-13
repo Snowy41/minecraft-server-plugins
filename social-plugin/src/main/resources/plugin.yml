@@ -1,0 +1,61 @@
+name: SocialPlugin
+version: '${version}'
+main: com.yourserver.social.SocialPlugin
+api-version: '1.21'
+author: MCBZH
+description: Friends, Parties, and Clans system with cross-server support
+
+# Depends on CorePlugin for database and Redis
+depend:
+  - CorePlugin
+
+# Soft dependencies
+softdepend:
+  - LobbyPlugin
+
+# Load order
+load: POSTWORLD
+
+commands:
+  friend:
+    description: Manage friends
+    usage: /<command> <add|remove|accept|deny|list>
+    permission: social.friend
+    aliases: [f, friends]
+
+  party:
+    description: Manage parties
+    usage: /<command> <create|invite|accept|leave|kick|warp|list|chat>
+    permission: social.party
+    aliases: [p]
+
+  clan:
+    description: Manage clans
+    usage: /<command> <create|invite|accept|leave|kick|promote|demote|chat|list>
+    permission: social.clan
+    aliases: [c, guild]
+
+permissions:
+  social.admin:
+    description: Access to all social features
+    default: op
+    children:
+      social.friend: true
+      social.party: true
+      social.clan: true
+
+  social.friend:
+    description: Use friend system
+    default: true
+
+  social.party:
+    description: Use party system
+    default: true
+
+  social.clan:
+    description: Use clan system
+    default: true
+
+  social.clan.create:
+    description: Create clans
+    default: true

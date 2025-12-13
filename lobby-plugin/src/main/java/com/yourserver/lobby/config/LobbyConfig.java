@@ -112,10 +112,15 @@ public class LobbyConfig {
                 node.node("pvp").getBoolean(true),
                 node.node("hunger").getBoolean(true),
                 node.node("weather-clear").getBoolean(true),
-                node.node("always-day").getBoolean(true),        // ADD THIS
+                node.node("always-day").getBoolean(true),
                 node.node("day-time").getLong(6000),
                 node.node("void-teleport").getBoolean(true),
                 node.node("void-y-level").getInt(-64),
+                node.node("prevent-death").getBoolean(true),                     // NEW
+                node.node("prevent-mob-spawning").getBoolean(true),             // NEW
+                node.node("prevent-friendly-mobs").getBoolean(true),            // NEW
+                node.node("prevent-hostile-mobs").getBoolean(true),             // NEW
+                node.node("prevent-all-interactions").getBoolean(true),         // NEW
                 spawnRegion
         );
     }

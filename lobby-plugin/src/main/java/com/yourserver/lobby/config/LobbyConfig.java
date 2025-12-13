@@ -244,17 +244,25 @@ public class LobbyConfig {
         private final boolean pvp;
         private final boolean hunger;
         private final boolean weatherClear;
-        private final boolean alwaysDay;        // ADD THIS FIELD
-        private final long dayTime;             // ADD THIS FIELD
+        private final boolean alwaysDay;
+        private final long dayTime;
         private final boolean voidTeleport;
         private final int voidYLevel;
+        private final boolean preventDeath;           // NEW
+        private final boolean preventMobSpawning;     // NEW
+        private final boolean preventFriendlyMobs;    // NEW
+        private final boolean preventHostileMobs;     // NEW
+        private final boolean preventAllInteractions; // NEW
         private final Region spawnRegion;
 
         public ProtectionConfig(boolean opBypass, boolean blockBreak, boolean blockPlace,
                                 boolean itemDrop, boolean itemPickup, boolean playerDamage, boolean fallDamage,
                                 boolean fireDamage, boolean drowningDamage, boolean voidDamage, boolean pvp,
-                                boolean hunger, boolean weatherClear, boolean alwaysDay, long dayTime,  // ADD THESE PARAMS
-                                boolean voidTeleport, int voidYLevel, Region spawnRegion) {
+                                boolean hunger, boolean weatherClear, boolean alwaysDay, long dayTime,
+                                boolean voidTeleport, int voidYLevel,
+                                boolean preventDeath, boolean preventMobSpawning,
+                                boolean preventFriendlyMobs, boolean preventHostileMobs,
+                                boolean preventAllInteractions, Region spawnRegion) {
             this.opBypass = opBypass;
             this.blockBreak = blockBreak;
             this.blockPlace = blockPlace;
@@ -268,10 +276,15 @@ public class LobbyConfig {
             this.pvp = pvp;
             this.hunger = hunger;
             this.weatherClear = weatherClear;
-            this.alwaysDay = alwaysDay;         // ADD THIS ASSIGNMENT
-            this.dayTime = dayTime;             // ADD THIS ASSIGNMENT
+            this.alwaysDay = alwaysDay;
+            this.dayTime = dayTime;
             this.voidTeleport = voidTeleport;
             this.voidYLevel = voidYLevel;
+            this.preventDeath = preventDeath;             // NEW
+            this.preventMobSpawning = preventMobSpawning; // NEW
+            this.preventFriendlyMobs = preventFriendlyMobs; // NEW
+            this.preventHostileMobs = preventHostileMobs;   // NEW
+            this.preventAllInteractions = preventAllInteractions; // NEW
             this.spawnRegion = spawnRegion;
         }
 
@@ -288,10 +301,15 @@ public class LobbyConfig {
         public boolean isPvp() { return pvp; }
         public boolean isHunger() { return hunger; }
         public boolean isWeatherClear() { return weatherClear; }
-        public boolean isAlwaysDay() { return alwaysDay; }       // ADD THIS GETTER
-        public long getDayTime() { return dayTime; }             // ADD THIS GETTER
+        public boolean isAlwaysDay() { return alwaysDay; }
+        public long getDayTime() { return dayTime; }
         public boolean isVoidTeleport() { return voidTeleport; }
         public int getVoidYLevel() { return voidYLevel; }
+        public boolean isPreventDeath() { return preventDeath; }                   // NEW
+        public boolean isPreventMobSpawning() { return preventMobSpawning; }       // NEW
+        public boolean isPreventFriendlyMobs() { return preventFriendlyMobs; }     // NEW
+        public boolean isPreventHostileMobs() { return preventHostileMobs; }       // NEW
+        public boolean isPreventAllInteractions() { return preventAllInteractions; } // NEW
         public Region getSpawnRegion() { return spawnRegion; }
     }
 

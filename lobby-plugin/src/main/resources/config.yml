@@ -48,6 +48,18 @@ protection:
   void-teleport: true
   void-y-level: -64
 
+  # NEW: Prevent player death (respawn instantly at spawn)
+  prevent-death: true
+
+  # NEW: Prevent mob spawning
+  prevent-mob-spawning: true
+  prevent-friendly-mobs: true  # Animals, villagers, etc.
+  prevent-hostile-mobs: true   # Zombies, skeletons, etc.
+
+  # NEW: Prevent ALL interactions except whitelisted
+  prevent-all-interactions: true
+
+
   # Protected regions (your spawn area)
   # All protections only apply within this region
   regions:

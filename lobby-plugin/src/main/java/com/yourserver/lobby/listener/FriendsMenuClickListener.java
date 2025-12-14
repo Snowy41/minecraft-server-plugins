@@ -1,6 +1,5 @@
 package com.yourserver.lobby.listener;
 
-import com.yourserver.social.SocialPlugin;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -8,9 +7,13 @@ import org.bukkit.event.EventHandler;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerInteractEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.plugin.Plugin;
+
+import java.lang.reflect.Method;
 
 /**
  * Listens for player head (friends menu) clicks to open friends GUI.
+ * Uses reflection to avoid compile-time dependency on SocialPlugin.
  *
  * IMPORTANT: This requires SocialPlugin to be installed and enabled!
  */
@@ -37,17 +40,23 @@ public class FriendsMenuClickListener implements Listener {
 
         event.setCancelled(true);
 
-        // Get SocialPlugin
-        SocialPlugin socialPlugin = (SocialPlugin) Bukkit.getPluginManager().getPlugin("SocialPlugin");
+        // Get SocialPlugin using reflection (no compile-time dependency needed)
+        Plugin socialPlugin = Bukkit.getPluginManager().getPlugin("SocialPlugin");
 
         if (socialPlugin == null) {
             player.sendMessage("§cFriends system is currently unavailable!");
             return;
         }
 
-        // Open friends GUI
+        // Open friends GUI using reflection
         try {
-            socialPlugin.getGuiManager().openFriendsGUI(player);
+            // Call: socialPlugin.getGuiManager().openFriendsGUI(player)
+            Method getGuiManager = socialPlugin.getClass().getMethod("getGuiManager");
+            Object guiManager = getGuiManager.invoke(socialPlugin);
+
+            Method openFriendsGUI = guiManager.getClass().getMethod("openFriendsGUI", Player.class);
+            openFriendsGUI.invoke(guiManager, player);
+
         } catch (Exception e) {
             player.sendMessage("§cFailed to open friends menu!");
             Bukkit.getLogger().warning("Failed to open friends GUI for " + player.getName() + ": " + e.getMessage());

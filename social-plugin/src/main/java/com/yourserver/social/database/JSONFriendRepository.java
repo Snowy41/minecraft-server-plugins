@@ -167,7 +167,8 @@ public class JSONFriendRepository {
                 count += (before - requests.size());
             }
 
-            return requestStorage.save(data).thenApply(v -> count);
+            int finalCount = count;
+            return requestStorage.save(data).thenApply(v -> finalCount);
         });
     }
 

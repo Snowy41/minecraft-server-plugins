@@ -1,29 +1,21 @@
 package com.yourserver.lobby.listener;
 
-import com.destroystokyo.paper.profile.PlayerProfile;
 import com.yourserver.lobby.LobbyPlugin;
 import com.yourserver.lobby.cosmetics.CosmeticsManager;
 import com.yourserver.lobby.scoreboard.ScoreboardManager;
 import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
-import com.yourserver.lobby.util.ItemBuilder;
-import net.kyori.adventure.text.Component;
-import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
 import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
-import org.bukkit.inventory.ItemStack;
-import org.bukkit.inventory.meta.ItemMeta;
-import org.bukkit.inventory.meta.SkullMeta;
 
 /**
  * Handles player join/quit events for lobby functionality.
- * UPDATED: Now sets player's own skull for Friends menu item!
+ * FIXED: Removed duplicate giveJoinItems() method - now uses plugin's method
  */
 public class PlayerConnectionListener implements Listener {
 
@@ -67,8 +59,9 @@ public class PlayerConnectionListener implements Listener {
         player.setFallDistance(0);
 
         // Give join items (only if player has items enabled)
+        // Uses the plugin's centralized method
         if (plugin.getItemToggleManager().hasItemsEnabled(player)) {
-            giveJoinItems(player);
+            plugin.giveJoinItems(player);
         }
 
         // Set up scoreboard
@@ -110,87 +103,5 @@ public class PlayerConnectionListener implements Listener {
 
         // Custom quit message (optional)
         event.quitMessage(null); // Remove default quit message
-    }
-
-    /**
-     * Gives join items to the player.
-     * UPDATED: Uses 1.21.8 data component system for player heads!
-     */
-    private void giveJoinItems(Player player) {
-        var joinItemsConfig = plugin.getLobbyConfig().getJoinItemsConfig();
-
-        if (!joinItemsConfig.isEnabled()) {
-            return;
-        }
-
-        // Clear inventory if configured
-        if (joinItemsConfig.isClearInventory()) {
-            player.getInventory().clear();
-        }
-
-        // Give configured items
-        for (var itemConfig : joinItemsConfig.getItems()) {
-            try {
-                Material material = Material.valueOf(itemConfig.getMaterial());
-
-                // Special handling for PLAYER_HEAD - use 1.21.8 data components
-                if (material == Material.PLAYER_HEAD) {
-                    // Create the player head with proper data components
-                    ItemStack skull = createPlayerHead(player, itemConfig);
-                    player.getInventory().setItem(itemConfig.getSlot(), skull);
-                } else {
-                    // Regular item (not a player head)
-                    ItemStack item = new ItemBuilder(material)
-                            .name(plugin.getMiniMessage().deserialize(itemConfig.getName()))
-                            .lore(itemConfig.getLore().stream()
-                                    .map(line -> plugin.getMiniMessage().deserialize(line))
-                                    .toList())
-                            .build();
-
-                    player.getInventory().setItem(itemConfig.getSlot(), item);
-                }
-            } catch (IllegalArgumentException e) {
-                plugin.getLogger().warning("Invalid material: " + itemConfig.getMaterial());
-            }
-        }
-    }
-
-    /**
-     * Creates a player head item using Paper's PlayerProfile API.
-     */
-    private ItemStack createPlayerHead(Player player,
-                                       com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
-        // Create base player head
-        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
-
-        // Get or create player profile
-        PlayerProfile profile = player.getPlayerProfile();
-
-        // Set the profile using SkullMeta
-        SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
-        if (skullMeta != null) {
-            // Set player profile directly
-            skullMeta.setPlayerProfile(profile);
-
-            // Set display name
-            Component displayName = plugin.getMiniMessage().deserialize(itemConfig.getName());
-            skullMeta.displayName(displayName.decoration(
-                    net.kyori.adventure.text.format.TextDecoration.ITALIC, false
-            ));
-
-            // Set lore
-            java.util.List<Component> loreComponents = itemConfig.getLore().stream()
-                    .map(line -> plugin.getMiniMessage().deserialize(line))
-                    .map(component -> component.decoration(
-                            net.kyori.adventure.text.format.TextDecoration.ITALIC, false
-                    ))
-                    .toList();
-            skullMeta.lore(loreComponents);
-
-            // Apply meta
-            skull.setItemMeta(skullMeta);
-        }
-
-        return skull;
     }
 }

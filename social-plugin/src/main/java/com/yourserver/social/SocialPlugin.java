@@ -5,6 +5,7 @@ import com.yourserver.social.command.FriendCommand;
 import com.yourserver.social.command.PartyCommand;
 import com.yourserver.social.command.ClanCommand;
 import com.yourserver.social.config.SocialConfig;
+import com.yourserver.social.database.JSONFriendRepository;
 import com.yourserver.social.database.MySQLClanRepository;
 import com.yourserver.social.database.MySQLFriendRepository;
 import com.yourserver.social.database.RedisPartyRepository;
@@ -61,7 +62,7 @@ public class SocialPlugin extends JavaPlugin {
         getLogger().info("Enabling SocialPlugin...");
 
         try {
-            // 1. Get CorePlugin (provides database + Redis)
+            // 1. Get CorePlugin (provides Redis only, NOT database)
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");
             if (corePlugin == null) {
                 throw new IllegalStateException("CorePlugin not found! SocialPlugin requires CorePlugin.");
@@ -75,17 +76,15 @@ public class SocialPlugin extends JavaPlugin {
             config = SocialConfig.load(getDataFolder());
             getLogger().info("✓ Configuration loaded");
 
-            // 4. Initialize database repositories
-            MySQLFriendRepository friendRepo = new MySQLFriendRepository(
-                    corePlugin.getDatabaseManager()
-            );
-            MySQLClanRepository clanRepo = new MySQLClanRepository(
-                    corePlugin.getDatabaseManager()
-            );
+            // 4. Initialize JSON repositories (NOT MySQL!)
+            getLogger().info("Using JSON storage (storage type: " + config.getStorageType() + ")");
+
+            JSONFriendRepository friendRepo = new JSONFriendRepository(getDataFolder(), getLogger());
+            JSONClanRepository clanRepo = new JSONClanRepository(getDataFolder(), getLogger());
             RedisPartyRepository partyRepo = new RedisPartyRepository(
                     corePlugin.getRedisManager()
             );
-            getLogger().info("✓ Repositories initialized");
+            getLogger().info("✓ JSON repositories initialized");
 
             // 5. Initialize cross-server messenger
             messenger = new SocialMessenger(

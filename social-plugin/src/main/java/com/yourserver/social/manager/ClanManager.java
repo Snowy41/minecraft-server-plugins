@@ -3,6 +3,7 @@ package com.yourserver.social.manager;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
+import com.yourserver.social.database.JSONClanRepository;
 import com.yourserver.social.database.MySQLClanRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Clan;
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class ClanManager {
 
     private final SocialPlugin plugin;
-    private final MySQLClanRepository repository;
+    private final JSONClanRepository repository;
     private final SocialMessenger messenger;
 
     // Cache clans (10 minutes)
@@ -30,7 +31,7 @@ public class ClanManager {
     private final Cache<UUID, String> playerClanCache;
 
     public ClanManager(@NotNull SocialPlugin plugin,
-                       @NotNull MySQLClanRepository repository,
+                       @NotNull JSONClanRepository repository,
                        @NotNull SocialMessenger messenger) {
         this.plugin = plugin;
         this.repository = repository;
@@ -419,7 +420,7 @@ public class ClanManager {
      * Gets pending clan invites.
      */
     @NotNull
-    public CompletableFuture<List<MySQLClanRepository.ClanInvite>> getPendingInvites(@NotNull UUID playerUuid) {
+    public CompletableFuture<List<JSONClanRepository.ClanInvite>> getPendingInvites(@NotNull UUID playerUuid) {
         return repository.getPendingInvites(playerUuid);
     }
 

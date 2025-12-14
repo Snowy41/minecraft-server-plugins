@@ -1,0 +1,8 @@
+{
+  "id": "social-plugin-velocity",
+  "name": "SocialPluginVelocity",
+  "version": "1.0.0",
+  "description": "Velocity-side social plugin for cross-server features",
+  "authors": ["MCBZH"],
+  "main": "com.yourserver.socialvel.SocialPluginVelocity"
+}

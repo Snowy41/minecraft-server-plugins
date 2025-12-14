@@ -3,6 +3,8 @@ package com.yourserver.social.manager;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
+import com.yourserver.social.database.JSONClanRepository;
+import com.yourserver.social.database.JSONFriendRepository;
 import com.yourserver.social.database.MySQLFriendRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Friend;
@@ -22,14 +24,14 @@ import java.util.concurrent.TimeUnit;
 public class FriendManager {
 
     private final SocialPlugin plugin;
-    private final MySQLFriendRepository repository;
+    private final JSONFriendRepository repository;
     private final SocialMessenger messenger;
 
     // Cache friends list (10 minutes)
     private final Cache<UUID, List<Friend>> friendsCache;
 
     public FriendManager(@NotNull SocialPlugin plugin,
-                         @NotNull MySQLFriendRepository repository,
+                         @NotNull JSONFriendRepository repository,
                          @NotNull SocialMessenger messenger) {
         this.plugin = plugin;
         this.repository = repository;

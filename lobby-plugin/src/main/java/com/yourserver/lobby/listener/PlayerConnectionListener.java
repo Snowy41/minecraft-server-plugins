@@ -1,5 +1,6 @@
 package com.yourserver.lobby.listener;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import com.yourserver.lobby.LobbyPlugin;
 import com.yourserver.lobby.cosmetics.CosmeticsManager;
 import com.yourserver.lobby.scoreboard.ScoreboardManager;
@@ -7,6 +8,7 @@ import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
 import com.yourserver.lobby.util.ItemBuilder;
 import net.kyori.adventure.text.Component;
+import org.bukkit.Bukkit;
 import org.bukkit.GameMode;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -16,6 +18,7 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
 
 /**
@@ -111,7 +114,7 @@ public class PlayerConnectionListener implements Listener {
 
     /**
      * Gives join items to the player.
-     * UPDATED: Now sets player's own skull for Friends menu item!
+     * UPDATED: Uses 1.21.8 data component system for player heads!
      */
     private void giveJoinItems(Player player) {
         var joinItemsConfig = plugin.getLobbyConfig().getJoinItemsConfig();
@@ -130,25 +133,10 @@ public class PlayerConnectionListener implements Listener {
             try {
                 Material material = Material.valueOf(itemConfig.getMaterial());
 
-                // Special handling for PLAYER_HEAD - set to player's own skull
+                // Special handling for PLAYER_HEAD - use 1.21.8 data components
                 if (material == Material.PLAYER_HEAD) {
-                    ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
-
-                    // Set the skull owner to the player
-                    if (skull.getItemMeta() instanceof SkullMeta skullMeta) {
-                        skullMeta.setOwningPlayer(player);
-
-                        // Set display name
-                        skullMeta.displayName(plugin.getMiniMessage().deserialize(itemConfig.getName()));
-
-                        // Set lore
-                        skullMeta.lore(itemConfig.getLore().stream()
-                                .map(line -> plugin.getMiniMessage().deserialize(line))
-                                .toList());
-
-                        skull.setItemMeta(skullMeta);
-                    }
-
+                    // Create the player head with proper data components
+                    ItemStack skull = createPlayerHead(player, itemConfig);
                     player.getInventory().setItem(itemConfig.getSlot(), skull);
                 } else {
                     // Regular item (not a player head)
@@ -165,5 +153,44 @@ public class PlayerConnectionListener implements Listener {
                 plugin.getLogger().warning("Invalid material: " + itemConfig.getMaterial());
             }
         }
+    }
+
+    /**
+     * Creates a player head item using Paper's PlayerProfile API.
+     */
+    private ItemStack createPlayerHead(Player player,
+                                       com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
+        // Create base player head
+        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+
+        // Get or create player profile
+        PlayerProfile profile = player.getPlayerProfile();
+
+        // Set the profile using SkullMeta
+        SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
+        if (skullMeta != null) {
+            // Set player profile directly
+            skullMeta.setPlayerProfile(profile);
+
+            // Set display name
+            Component displayName = plugin.getMiniMessage().deserialize(itemConfig.getName());
+            skullMeta.displayName(displayName.decoration(
+                    net.kyori.adventure.text.format.TextDecoration.ITALIC, false
+            ));
+
+            // Set lore
+            java.util.List<Component> loreComponents = itemConfig.getLore().stream()
+                    .map(line -> plugin.getMiniMessage().deserialize(line))
+                    .map(component -> component.decoration(
+                            net.kyori.adventure.text.format.TextDecoration.ITALIC, false
+                    ))
+                    .toList();
+            skullMeta.lore(loreComponents);
+
+            // Apply meta
+            skull.setItemMeta(skullMeta);
+        }
+
+        return skull;
     }
 }

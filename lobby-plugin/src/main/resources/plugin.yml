@@ -9,18 +9,14 @@ description: Lobby system with scoreboards, tab list, GUIs, and cosmetics
 depend:
   - CorePlugin
   - APIModule
+  - SocialPlugin
 
 # Soft dependencies (optional)
 softdepend:
   - NPCPlugin
   - LuckPerms
-  - SocialPlugin
-
 
 load: POSTWORLD
-loadafter:
-  - SocialPlugin
-
 
 commands:
   lobby:

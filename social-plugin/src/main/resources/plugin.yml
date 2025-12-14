@@ -15,7 +15,7 @@ softdepend:
   - LobbyPlugin
 
 # Load order
-load: POSTWORLD
+load: STARTUP
 
 commands:
   friend:

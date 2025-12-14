@@ -1,5 +1,6 @@
 package com.yourserver.lobby;
 
+import com.destroystokyo.paper.profile.PlayerProfile;
 import com.yourserver.core.CorePlugin;
 import com.yourserver.lobby.command.LobbyCommand;
 import com.yourserver.lobby.command.SpawnCommand;
@@ -16,10 +17,12 @@ import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
 import com.yourserver.lobby.time.TimeManager;
 import com.yourserver.lobby.util.ItemBuilder;
+import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import java.util.logging.Level;
@@ -310,17 +313,61 @@ public class LobbyPlugin extends JavaPlugin {
             try {
                 Material material = Material.valueOf(itemConfig.getMaterial());
 
-                ItemStack item = new ItemBuilder(material)
-                        .name(miniMessage.deserialize(itemConfig.getName()))
-                        .lore(itemConfig.getLore().stream()
-                                .map(line -> miniMessage.deserialize(line))
-                                .toList())
-                        .build();
+                if (material == Material.PLAYER_HEAD) {
+                    ItemStack skull = createPlayerHead(player, itemConfig);
+                    player.getInventory().setItem(itemConfig.getSlot(), skull);
+                } else {
+                    ItemStack item = new ItemBuilder(material)
+                            .name(miniMessage.deserialize(itemConfig.getName()))
+                            .lore(itemConfig.getLore().stream()
+                                    .map(line -> miniMessage.deserialize(line))
+                                    .toList())
+                            .build();
 
-                player.getInventory().setItem(itemConfig.getSlot(), item);
+                    player.getInventory().setItem(itemConfig.getSlot(), item);
+                }
             } catch (IllegalArgumentException e) {
                 getLogger().warning("Invalid material: " + itemConfig.getMaterial());
             }
         }
+    }
+
+    /**
+     * Creates a player head item using Paper's PlayerProfile API.
+     */
+    private ItemStack createPlayerHead(Player player,
+                                       com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
+        // Create base player head
+        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+
+        // Get or create player profile
+        PlayerProfile profile = player.getPlayerProfile();
+
+        // Set the profile using SkullMeta
+        SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
+        if (skullMeta != null) {
+            // Set player profile directly
+            skullMeta.setPlayerProfile(profile);
+
+            // Set display name
+            Component displayName = this.getMiniMessage().deserialize(itemConfig.getName());
+            skullMeta.displayName(displayName.decoration(
+                    net.kyori.adventure.text.format.TextDecoration.ITALIC, false
+            ));
+
+            // Set lore
+            java.util.List<Component> loreComponents = itemConfig.getLore().stream()
+                    .map(line -> this.getMiniMessage().deserialize(line))
+                    .map(component -> component.decoration(
+                            net.kyori.adventure.text.format.TextDecoration.ITALIC, false
+                    ))
+                    .toList();
+            skullMeta.lore(loreComponents);
+
+            // Apply meta
+            skull.setItemMeta(skullMeta);
+        }
+
+        return skull;
     }
 }

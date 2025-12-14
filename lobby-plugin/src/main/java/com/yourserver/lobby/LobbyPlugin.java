@@ -19,6 +19,7 @@ import com.yourserver.lobby.time.TimeManager;
 import com.yourserver.lobby.util.ItemBuilder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
+import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.ItemStack;
@@ -292,7 +293,7 @@ public class LobbyPlugin extends JavaPlugin {
 
     /**
      * Gives join items to a player.
-     * Public method so it can be called by ItemToggleManager.
+     * DEBUG VERSION: Added extensive logging to track the issue.
      *
      * @param player The player
      */
@@ -300,23 +301,35 @@ public class LobbyPlugin extends JavaPlugin {
         var joinItemsConfig = lobbyConfig.getJoinItemsConfig();
 
         if (!joinItemsConfig.isEnabled()) {
+            getLogger().info("Join items disabled in config");
             return;
         }
+
+        getLogger().info("Giving join items to " + player.getName());
 
         // Clear inventory if configured
         if (joinItemsConfig.isClearInventory()) {
             player.getInventory().clear();
+            getLogger().info("Cleared inventory");
         }
 
         // Give configured items
+        int itemCount = 0;
         for (var itemConfig : joinItemsConfig.getItems()) {
+            itemCount++;
+            getLogger().info("Processing item #" + itemCount + ": " + itemConfig.getMaterial() + " at slot " + itemConfig.getSlot());
+
             try {
                 Material material = Material.valueOf(itemConfig.getMaterial());
+                getLogger().info("Material parsed successfully: " + material.name());
 
                 if (material == Material.PLAYER_HEAD) {
-                    ItemStack skull = createPlayerHead(player, itemConfig);
-                    player.getInventory().setItem(itemConfig.getSlot(), skull);
+                    getLogger().info("Detected PLAYER_HEAD - giving with delay");
+                    // FIXED: Give player head with a delay to ensure profile is loaded
+                    givePlayerHeadDelayed(player, itemConfig);
                 } else {
+                    getLogger().info("Regular item - giving immediately");
+                    // Regular items - give immediately
                     ItemStack item = new ItemBuilder(material)
                             .name(miniMessage.deserialize(itemConfig.getName()))
                             .lore(itemConfig.getLore().stream()
@@ -325,35 +338,99 @@ public class LobbyPlugin extends JavaPlugin {
                             .build();
 
                     player.getInventory().setItem(itemConfig.getSlot(), item);
+                    getLogger().info("Item placed in slot " + itemConfig.getSlot());
                 }
             } catch (IllegalArgumentException e) {
-                getLogger().warning("Invalid material: " + itemConfig.getMaterial());
+                getLogger().warning("Invalid material: " + itemConfig.getMaterial() + " - " + e.getMessage());
+                e.printStackTrace();
+            } catch (Exception e) {
+                getLogger().severe("Error giving item: " + e.getMessage());
+                e.printStackTrace();
             }
         }
+
+        getLogger().info("Finished processing " + itemCount + " items");
+    }
+
+    /**
+     * Gives player head with a slight delay to ensure profile is loaded.
+     * This fixes the issue where player heads don't show textures on join.
+     */
+    private void givePlayerHeadDelayed(Player player,
+                                       com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
+        getLogger().info("Scheduling delayed player head for " + player.getName() + " at slot " + itemConfig.getSlot());
+
+        // Give the head after a 1-tick delay to ensure the player's profile is fully loaded
+        Bukkit.getScheduler().runTaskLater(this, () -> {
+            getLogger().info("Delayed task executing for player head");
+
+            if (!player.isOnline()) {
+                getLogger().warning("Player " + player.getName() + " went offline before head could be given");
+                return;
+            }
+
+            try {
+                getLogger().info("Creating player head...");
+                ItemStack skull = createPlayerHead(player, itemConfig);
+
+                if (skull == null) {
+                    getLogger().severe("createPlayerHead returned null!");
+                    return;
+                }
+
+                getLogger().info("Player head created, placing in slot " + itemConfig.getSlot());
+                player.getInventory().setItem(itemConfig.getSlot(), skull);
+
+                getLogger().info("Player head successfully placed!");
+
+                // Verify it's actually there
+                ItemStack check = player.getInventory().getItem(itemConfig.getSlot());
+                if (check != null && check.getType() == Material.PLAYER_HEAD) {
+                    getLogger().info("VERIFIED: Player head is in inventory at slot " + itemConfig.getSlot());
+                } else {
+                    getLogger().severe("FAILED: Player head not in inventory! Slot contains: " +
+                            (check == null ? "null" : check.getType().name()));
+                }
+
+            } catch (Exception e) {
+                getLogger().severe("Error in delayed player head task: " + e.getMessage());
+                e.printStackTrace();
+            }
+        }, 1L); // 1 tick delay (50ms)
     }
 
     /**
      * Creates a player head item using Paper's PlayerProfile API.
+     * Uses setOwningPlayer which is more reliable than PlayerProfile for online players.
      */
     private ItemStack createPlayerHead(Player player,
                                        com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
-        // Create base player head
-        ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+        getLogger().info("createPlayerHead called for " + player.getName());
 
-        // Get or create player profile
-        PlayerProfile profile = player.getPlayerProfile();
+        try {
+            // Create base player head
+            ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
+            getLogger().info("Created ItemStack with PLAYER_HEAD material");
 
-        // Set the profile using SkullMeta
-        SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
-        if (skullMeta != null) {
-            // Set player profile directly
-            skullMeta.setPlayerProfile(profile);
+            SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
+
+            if (skullMeta == null) {
+                getLogger().severe("SkullMeta is null!");
+                return skull;
+            }
+
+            getLogger().info("Got SkullMeta successfully");
+
+            // Use setOwningPlayer - this is the most reliable method for online players
+            skullMeta.setOwningPlayer(player);
+            getLogger().info("Set owning player to " + player.getName());
 
             // Set display name
             Component displayName = this.getMiniMessage().deserialize(itemConfig.getName());
             skullMeta.displayName(displayName.decoration(
                     net.kyori.adventure.text.format.TextDecoration.ITALIC, false
             ));
+            getLogger().info("Set display name");
 
             // Set lore
             java.util.List<Component> loreComponents = itemConfig.getLore().stream()
@@ -363,11 +440,22 @@ public class LobbyPlugin extends JavaPlugin {
                     ))
                     .toList();
             skullMeta.lore(loreComponents);
+            getLogger().info("Set lore with " + loreComponents.size() + " lines");
 
             // Apply meta
             skull.setItemMeta(skullMeta);
-        }
+            getLogger().info("Applied skull meta to ItemStack");
 
-        return skull;
+            // Verify
+            getLogger().info("Final skull type: " + skull.getType().name());
+            getLogger().info("Final skull amount: " + skull.getAmount());
+
+            return skull;
+
+        } catch (Exception e) {
+            getLogger().severe("Exception in createPlayerHead: " + e.getMessage());
+            e.printStackTrace();
+            return null;
+        }
     }
 }

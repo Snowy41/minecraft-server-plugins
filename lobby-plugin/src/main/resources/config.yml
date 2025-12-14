@@ -153,7 +153,7 @@ join-items:
       lore:
         - "<gray>Right-click to select a game!"
 
-    - slot: 4
+    - slot: 7
       material: PLAYER_HEAD
       name: "<gradient:#4169E1:#1E90FF><bold>Friends Menu</bold></gradient>"
       lore:

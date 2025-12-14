@@ -86,7 +86,7 @@ public class SocialPlugin extends JavaPlugin {
             // 5. Initialize cross-server messenger
             messenger = new SocialMessenger(
                     this,
-                    corePlugin.getRedisManager()
+                    corePlugin.getRedisMessenger()
             );
             getLogger().info("✓ Redis messaging initialized");
 

@@ -1,0 +1,7 @@
+name: APIModule
+version: '1.0.0'
+main: com.yourserver.api.APIModulePlugin
+api-version: '1.21'
+author: MCBZH
+description: Shared API module for all server plugins
+load: STARTUP

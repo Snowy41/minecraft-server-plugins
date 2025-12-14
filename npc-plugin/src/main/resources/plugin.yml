@@ -8,6 +8,8 @@ description: Real player NPCs with skins using ProtocolLib
 # Requires ProtocolLib
 depend:
   - ProtocolLib
+  - CorePlugin
+  - APIModule
 
 # Soft dependencies (optional integrations)
 softdepend:

@@ -2,8 +2,10 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/api-module/minecraft-server.api-module.main.iml" filepath="$PROJECT_DIR$/.idea/modules/api-module/minecraft-server.api-module.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/core-plugin/minecraft-server.core-plugin.main.iml" filepath="$PROJECT_DIR$/.idea/modules/core-plugin/minecraft-server.core-plugin.main.iml" />
       <module fileurl="file://$PROJECT_DIR$/.idea/modules/core-plugin/minecraft-server.core-plugin.test.iml" filepath="$PROJECT_DIR$/.idea/modules/core-plugin/minecraft-server.core-plugin.test.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/modules/social-plugin-velocity/minecraft-server.social-plugin-velocity.main.iml" filepath="$PROJECT_DIR$/.idea/modules/social-plugin-velocity/minecraft-server.social-plugin-velocity.main.iml" />
     </modules>
   </component>
 </project>

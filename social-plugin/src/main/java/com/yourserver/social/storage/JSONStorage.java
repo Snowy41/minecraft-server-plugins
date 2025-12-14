@@ -9,6 +9,7 @@ import java.io.*;
 import java.lang.reflect.Type;
 import java.nio.file.Files;
 import java.nio.file.StandardCopyOption;
+import java.time.Instant;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -63,6 +64,7 @@ public class JSONStorage<T> {
 
         this.gson = new GsonBuilder()
                 .setPrettyPrinting()
+                .registerTypeAdapter(Instant.class, new InstantAdapter())
                 .create();
 
         this.lock = new ReentrantReadWriteLock();

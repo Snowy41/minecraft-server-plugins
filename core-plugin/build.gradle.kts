@@ -17,6 +17,7 @@ dependencies {
     // Paper API
     compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
     compileOnly("net.luckperms:api:5.4")
+    compileOnly(project(":api-module"))
 
     // Adventure API (modern text components)
     implementation("net.kyori:adventure-api:4.17.0")
@@ -88,7 +89,9 @@ tasks {
     shadowJar {
         archiveBaseName.set("CorePlugin")
         archiveClassifier.set("")
-
+        dependencies {
+            exclude(dependency("com.yourserver:api-module"))
+        }
         // Relocate dependencies to avoid conflicts
         relocate("com.zaxxer.hikari", "com.yourserver.core.libs.hikari")
         relocate("io.lettuce", "com.yourserver.core.libs.lettuce")

@@ -1,9 +1,11 @@
 package com.yourserver.social.database;
 
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;
 import com.google.gson.reflect.TypeToken;
 import com.yourserver.api.messaging.RedisMessenger;
 import com.yourserver.social.model.Party;
+import com.yourserver.social.storage.InstantAdapter;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -25,8 +27,9 @@ public class RedisPartyRepository {
 
     public RedisPartyRepository(@NotNull RedisMessenger redis) {
         this.redis = redis;
-        this.gson = new Gson();
-    }
+        this.gson = new GsonBuilder()
+                .registerTypeAdapter(Instant.class, new InstantAdapter())
+                .create();    }
 
     /**
      * Saves a party to Redis.

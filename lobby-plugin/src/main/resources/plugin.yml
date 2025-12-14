@@ -1,5 +1,5 @@
 name: LobbyPlugin
-version: '${version}'
+version: '1.0.0'
 main: com.yourserver.lobby.LobbyPlugin
 api-version: '1.21'
 author: MCBZH
@@ -8,14 +8,19 @@ description: Lobby system with scoreboards, tab list, GUIs, and cosmetics
 # Depends on CorePlugin for database and Redis
 depend:
   - CorePlugin
+  - APIModule
 
 # Soft dependencies (optional)
 softdepend:
   - NPCPlugin
   - LuckPerms
+  - SocialPlugin
 
-# Load order
+
 load: POSTWORLD
+loadafter:
+  - SocialPlugin
+
 
 commands:
   lobby:

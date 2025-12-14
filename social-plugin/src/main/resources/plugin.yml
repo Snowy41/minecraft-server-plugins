@@ -7,6 +7,7 @@ description: Friends, Parties, and Clans system with cross-server support
 
 # Depends on CorePlugin for database and Redis
 depend:
+  - APIModule
   - CorePlugin
 
 # Soft dependencies

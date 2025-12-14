@@ -7,10 +7,11 @@ description: Core infrastructure plugin providing database, Redis, and player da
 
 # Load before other plugins
 load: STARTUP
+depend:
+  - APIModule
 loadbefore:
   - LobbyPlugin
   - BattleRoyalePlugin
-
 # Soft dependencies (plugins that can optionally be present)
 softdepend:
   - LuckPerms

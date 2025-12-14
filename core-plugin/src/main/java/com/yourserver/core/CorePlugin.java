@@ -1,5 +1,6 @@
 package com.yourserver.core;
 
+import com.yourserver.api.messaging.RedisMessenger;
 import com.yourserver.core.buildmode.BuildModeManager;
 import com.yourserver.core.config.DatabaseConfig;
 import com.yourserver.core.database.DatabaseManager;
@@ -148,4 +149,11 @@ public class CorePlugin extends JavaPlugin {
     }
 
     public RankDisplayManager getRankDisplayManager() { return rankDisplayManager; }
+
+    /**
+     * Gets the Redis messenger for cross-server communication.
+     *
+     * @return RedisMessenger instance
+     */
+    public RedisMessenger getRedisMessenger() { return redisManager; }
 }

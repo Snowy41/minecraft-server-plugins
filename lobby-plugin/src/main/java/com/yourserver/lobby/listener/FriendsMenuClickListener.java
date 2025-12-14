@@ -43,8 +43,9 @@ public class FriendsMenuClickListener implements Listener {
         // Get SocialPlugin using reflection (no compile-time dependency needed)
         Plugin socialPlugin = Bukkit.getPluginManager().getPlugin("SocialPlugin");
 
-        if (socialPlugin == null) {
+        if (socialPlugin == null || !socialPlugin.isEnabled()) {
             player.sendMessage("§cFriends system is currently unavailable!");
+            player.sendMessage("§7The SocialPlugin is not loaded yet. Please try again in a moment.");
             return;
         }
 

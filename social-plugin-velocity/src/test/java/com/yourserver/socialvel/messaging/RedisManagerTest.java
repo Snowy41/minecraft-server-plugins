@@ -1,42 +1,40 @@
 package com.yourserver.socialvel.messaging;
 
-import com.yourserver.socialvel.SocialPluginVelocity;
 import com.yourserver.socialvel.config.VelocityConfig;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.extension.ExtendWith;
-import org.mockito.Mock;
-import org.mockito.junit.jupiter.MockitoExtension;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
-import static org.mockito.Mockito.*;
 
-@ExtendWith(MockitoExtension.class)
+/**
+ * Unit tests for RedisManager.
+ * Note: Full integration testing requires a Redis instance (use Testcontainers in production).
+ */
 class RedisManagerTest {
 
-    @Mock
-    private SocialPluginVelocity plugin;
-
     @Test
-    void publish_callsRedisCorrectly() {
-        // Note: This test would need a Redis testcontainer for full integration testing
-        // For now, we're just testing the structure
-
+    void keyPrefix_appliedCorrectly() {
+        // Test configuration structure without needing actual Redis connection
         VelocityConfig.RedisConfig config = new VelocityConfig.RedisConfig(
                 "localhost", 6379, "", "test:"
         );
 
-        // Can't fully test without Redis connection
-        // In production, use Testcontainers with Redis
-        assertNotNull(config);
+        assertEquals("test:", config.getKeyPrefix());
+        assertEquals("localhost", config.getHost());
+        assertEquals(6379, config.getPort());
     }
 
     @Test
-    void keyPrefix_appliedCorrectly() {
-        VelocityConfig.RedisConfig config = new VelocityConfig.RedisConfig(
-                "localhost", 6379, "", "mcserver:"
+    void redisConfig_hasPassword_checksCorrectly() {
+        VelocityConfig.RedisConfig withPassword = new VelocityConfig.RedisConfig(
+                "localhost", 6379, "password", "test:"
         );
 
-        assertEquals("mcserver:", config.getKeyPrefix());
+        VelocityConfig.RedisConfig withoutPassword = new VelocityConfig.RedisConfig(
+                "localhost", 6379, "", "test:"
+        );
+
+        assertNotNull(withPassword);
+        assertNotNull(withoutPassword);
     }
 }

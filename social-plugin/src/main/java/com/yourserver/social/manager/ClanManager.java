@@ -484,6 +484,48 @@ public class ClanManager {
 
     // ===== UTILITY =====
 
+    @NotNull
+    public CompletableFuture<java.util.Optional<Clan>> getClanByName(@NotNull String name) {
+        // Check cache first
+        Clan cached = clanCache.asMap().values().stream()
+                .filter(clan -> clan.getName().equalsIgnoreCase(name))
+                .findFirst()
+                .orElse(null);
+
+        if (cached != null) {
+            return CompletableFuture.completedFuture(java.util.Optional.of(cached));
+        }
+
+        // Load from repository
+        return repository.getClanByName(name).thenApply(clanOpt -> {
+            clanOpt.ifPresent(clan -> clanCache.put(clan.getId(), clan));
+            return clanOpt;
+        });
+    }
+
+    /**
+     * Gets a clan by tag (cached).
+     */
+    @NotNull
+    public CompletableFuture<java.util.Optional<Clan>> getClanByTag(@NotNull String tag) {
+        // Check cache first
+        Clan cached = clanCache.asMap().values().stream()
+                .filter(clan -> clan.getTag().equalsIgnoreCase(tag))
+                .findFirst()
+                .orElse(null);
+
+        if (cached != null) {
+            return CompletableFuture.completedFuture(java.util.Optional.of(cached));
+        }
+
+        // Load from repository
+        return repository.getClanByTag(tag).thenApply(clanOpt -> {
+            clanOpt.ifPresent(clan -> clanCache.put(clan.getId(), clan));
+            return clanOpt;
+        });
+    }
+
+
     private void notifyClanMembers(@NotNull Clan clan, @NotNull String message) {
         for (UUID member : clan.getMembers().keySet()) {
             Player p = Bukkit.getPlayer(member);

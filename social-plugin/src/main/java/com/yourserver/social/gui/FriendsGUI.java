@@ -11,6 +11,7 @@ import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.bukkit.inventory.Inventory;
+import org.bukkit.inventory.ItemFlag;
 import org.bukkit.inventory.ItemStack;
 import org.bukkit.inventory.meta.ItemMeta;
 import org.bukkit.inventory.meta.SkullMeta;
@@ -22,6 +23,7 @@ import java.util.UUID;
 /**
  * Friends management GUI.
  * Shows online/offline friends and pending requests.
+ * IMPROVED: Now includes navigation to Party and Clan menus!
  */
 public class FriendsGUI {
 
@@ -39,8 +41,8 @@ public class FriendsGUI {
         this.friendManager = friendManager;
         this.player = player;
 
-        String title = plugin.getSocialConfig().getMessagesConfig().getPrefix() + "Your Friends";
-        this.inventory = Bukkit.createInventory(null, 54, Component.text(title));
+        String title = "§9§lYour Friends"; // Using legacy format for title
+        this.inventory = Bukkit.createInventory(null, 54, title);
 
         loadData();
     }
@@ -79,6 +81,9 @@ public class FriendsGUI {
 
         // Navigation
         renderNavigation();
+
+        // NEW: Social menu navigation
+        renderSocialNavigation();
 
         // Fill empty slots
         fillEmpty();
@@ -231,7 +236,8 @@ public class FriendsGUI {
             ItemStack prev = new ItemStack(Material.ARROW);
             ItemMeta meta = prev.getItemMeta();
             if (meta != null) {
-                meta.displayName(Component.text("Previous Page", NamedTextColor.YELLOW));
+                meta.displayName(Component.text("Previous Page", NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false));
                 prev.setItemMeta(meta);
             }
             inventory.setItem(45, prev);
@@ -241,7 +247,8 @@ public class FriendsGUI {
         ItemStack close = new ItemStack(Material.BARRIER);
         ItemMeta closeMeta = close.getItemMeta();
         if (closeMeta != null) {
-            closeMeta.displayName(Component.text("Close", NamedTextColor.RED));
+            closeMeta.displayName(Component.text("Close", NamedTextColor.RED)
+                    .decoration(TextDecoration.ITALIC, false));
             close.setItemMeta(closeMeta);
         }
         inventory.setItem(49, close);
@@ -252,11 +259,54 @@ public class FriendsGUI {
             ItemStack next = new ItemStack(Material.ARROW);
             ItemMeta meta = next.getItemMeta();
             if (meta != null) {
-                meta.displayName(Component.text("Next Page", NamedTextColor.YELLOW));
+                meta.displayName(Component.text("Next Page", NamedTextColor.YELLOW)
+                        .decoration(TextDecoration.ITALIC, false));
                 next.setItemMeta(meta);
             }
             inventory.setItem(53, next);
         }
+    }
+
+    /**
+     * NEW: Renders social menu navigation buttons.
+     * Allows quick access to Party and Clan menus.
+     */
+    private void renderSocialNavigation() {
+        // Party menu button (slot 46)
+        ItemStack partyButton = new ItemStack(Material.EMERALD);
+        ItemMeta partyMeta = partyButton.getItemMeta();
+        if (partyMeta != null) {
+            partyMeta.displayName(Component.text("Party Menu", NamedTextColor.GREEN, TextDecoration.BOLD)
+                    .decoration(TextDecoration.ITALIC, false));
+
+            List<Component> partyLore = new ArrayList<>();
+            partyLore.add(Component.empty());
+            partyLore.add(Component.text("Click to open party menu", NamedTextColor.GRAY));
+            partyLore.add(Component.text("(Coming Soon)", NamedTextColor.DARK_GRAY));
+
+            partyMeta.lore(partyLore);
+            partyMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            partyButton.setItemMeta(partyMeta);
+        }
+        inventory.setItem(46, partyButton);
+
+        // Clan menu button (slot 52)
+        ItemStack clanButton = new ItemStack(Material.DIAMOND);
+        ItemMeta clanMeta = clanButton.getItemMeta();
+        if (clanMeta != null) {
+            clanMeta.displayName(Component.text("Clan Menu", NamedTextColor.AQUA, TextDecoration.BOLD)
+                    .decoration(TextDecoration.ITALIC, false));
+
+            List<Component> clanLore = new ArrayList<>();
+            clanLore.add(Component.empty());
+            clanLore.add(Component.text("Click to open clan menu", NamedTextColor.GRAY));
+            clanLore.add(Component.text("(Coming Soon)", NamedTextColor.DARK_GRAY));
+
+            clanMeta.lore(clanLore);
+            clanMeta.addItemFlags(ItemFlag.HIDE_ATTRIBUTES);
+            clanButton.setItemMeta(clanMeta);
+        }
+        inventory.setItem(52, clanButton);
     }
 
     /**

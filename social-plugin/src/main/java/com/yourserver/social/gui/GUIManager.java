@@ -8,9 +8,11 @@ import com.yourserver.social.model.Friend;
 import com.yourserver.social.model.FriendRequest;
 import org.bukkit.entity.Player;
 import org.bukkit.event.EventHandler;
+import org.bukkit.event.EventPriority;
 import org.bukkit.event.Listener;
 import org.bukkit.event.inventory.InventoryClickEvent;
 import org.bukkit.event.inventory.InventoryCloseEvent;
+import org.bukkit.event.inventory.InventoryDragEvent;
 import org.bukkit.inventory.Inventory;
 import org.jetbrains.annotations.NotNull;
 
@@ -20,7 +22,7 @@ import java.util.UUID;
 
 /**
  * Manages all social GUIs.
- * Handles click events and GUI lifecycle.
+ * FIXED: Now properly prevents ALL item interactions in GUIs.
  */
 public class GUIManager implements Listener {
 
@@ -31,6 +33,7 @@ public class GUIManager implements Listener {
 
     // Track open GUIs
     private final Map<UUID, FriendsGUI> openFriendsGUIs = new HashMap<>();
+    private final Map<UUID, Inventory> trackedInventories = new HashMap<>();
 
     public GUIManager(@NotNull SocialPlugin plugin,
                       @NotNull FriendManager friendManager,
@@ -48,6 +51,7 @@ public class GUIManager implements Listener {
     public void openFriendsGUI(@NotNull Player player) {
         FriendsGUI gui = new FriendsGUI(plugin, friendManager, player);
         openFriendsGUIs.put(player.getUniqueId(), gui);
+        trackedInventories.put(player.getUniqueId(), gui.getInventory());
         gui.open();
     }
 
@@ -66,34 +70,68 @@ public class GUIManager implements Listener {
     }
 
     /**
-     * Handles inventory clicks in social GUIs.
+     * FIXED: Now uses HIGHEST priority and cancels ALL interactions.
      */
-    @EventHandler
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
     public void onInventoryClick(InventoryClickEvent event) {
         if (!(event.getWhoClicked() instanceof Player player)) {
             return;
         }
 
+        // Check if this is a tracked social GUI
+        Inventory trackedInv = trackedInventories.get(player.getUniqueId());
+        if (trackedInv == null) {
+            return;
+        }
+
+        // CRITICAL: Cancel ALL interactions in social GUIs
+        // This includes:
+        // - Clicking items in the GUI
+        // - Clicking items in player inventory while GUI is open
+        // - Shift-clicking
+        // - Number key clicks
+        // - Drop key while GUI is open
+        event.setCancelled(true);
+
+        // Only process clicks if they're in the actual GUI inventory
+        if (!event.getInventory().equals(trackedInv)) {
+            return; // Click was in player inventory, just cancel and ignore
+        }
+
+        // Process the GUI click
         FriendsGUI friendsGUI = openFriendsGUIs.get(player.getUniqueId());
         if (friendsGUI == null) {
             return;
         }
 
-        // Check if clicked in the GUI
-        if (!event.getInventory().equals(friendsGUI.getInventory())) {
-            return;
-        }
+        int slot = event.getRawSlot();
 
-        event.setCancelled(true);
-
+        // Ignore clicks on empty slots
         if (event.getCurrentItem() == null) {
             return;
         }
 
-        int slot = event.getRawSlot();
-
         // Handle click based on slot and item
         handleFriendsGUIClick(player, friendsGUI, slot, event.isRightClick());
+    }
+
+    /**
+     * FIXED: Also prevent dragging items in GUIs.
+     */
+    @EventHandler(priority = EventPriority.HIGHEST, ignoreCancelled = false)
+    public void onInventoryDrag(InventoryDragEvent event) {
+        if (!(event.getWhoClicked() instanceof Player player)) {
+            return;
+        }
+
+        // Check if this is a tracked social GUI
+        Inventory trackedInv = trackedInventories.get(player.getUniqueId());
+        if (trackedInv == null) {
+            return;
+        }
+
+        // Cancel ALL drag events in social GUIs
+        event.setCancelled(true);
     }
 
     /**
@@ -103,6 +141,12 @@ public class GUIManager implements Listener {
         // Close button (slot 49)
         if (slot == 49) {
             player.closeInventory();
+            return;
+        }
+
+        // Navigation buttons (slots 45, 53)
+        if (slot == 45 || slot == 53) {
+            // TODO: Implement pagination when FriendsGUI supports it
             return;
         }
 
@@ -166,15 +210,21 @@ public class GUIManager implements Listener {
     /**
      * Cleans up when inventory is closed.
      */
-    @EventHandler
+    @EventHandler(priority = EventPriority.MONITOR)
     public void onInventoryClose(InventoryCloseEvent event) {
         if (!(event.getPlayer() instanceof Player player)) {
             return;
         }
 
-        FriendsGUI friendsGUI = openFriendsGUIs.get(player.getUniqueId());
+        UUID uuid = player.getUniqueId();
+
+        // Clean up tracked inventories
+        trackedInventories.remove(uuid);
+
+        // Clean up specific GUI types
+        FriendsGUI friendsGUI = openFriendsGUIs.get(uuid);
         if (friendsGUI != null && event.getInventory().equals(friendsGUI.getInventory())) {
-            openFriendsGUIs.remove(player.getUniqueId());
+            openFriendsGUIs.remove(uuid);
         }
     }
 }

@@ -153,6 +153,17 @@ join-items:
       lore:
         - "<gray>Right-click to select a game!"
 
+    - slot: 4
+      material: PLAYER_HEAD
+      name: "<gradient:#4169E1:#1E90FF><bold>Friends Menu</bold></gradient>"
+      lore:
+        - ""
+        - "<gray>View your friends list"
+        - "<gray>Send friend requests"
+        - "<gray>Manage your social network"
+        - ""
+        - "<green>Right-click to open!"
+
     - slot: 8
       material: NETHER_STAR
       name: "<gradient:#FF1493:#9370DB><bold>Cosmetics</bold></gradient>"

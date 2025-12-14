@@ -108,7 +108,19 @@ public class LobbyPlugin extends JavaPlugin {
                     new NetherStarClickListener(guiManager),
                     this
             );
+
+            if (getServer().getPluginManager().isPluginEnabled("SocialPlugin")) {
+                getServer().getPluginManager().registerEvents(
+                        new com.yourserver.lobby.listener.FriendsMenuClickListener(),
+                        this
+                );
+                getLogger().info("✓ Friends menu integration enabled");
+            } else {
+                getLogger().warning("SocialPlugin not found - friends menu will not work!");
+            }
+
             getServer().getPluginManager().registerEvents(guiManager, this);
+
 
             // Register rank display listener for nametags and tab list
             rankDisplayListener = new com.yourserver.lobby.listener.RankDisplayListener(corePlugin);

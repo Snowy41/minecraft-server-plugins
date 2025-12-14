@@ -16,9 +16,11 @@ import org.bukkit.event.Listener;
 import org.bukkit.event.player.PlayerJoinEvent;
 import org.bukkit.event.player.PlayerQuitEvent;
 import org.bukkit.inventory.ItemStack;
+import org.bukkit.inventory.meta.SkullMeta;
 
 /**
  * Handles player join/quit events for lobby functionality.
+ * UPDATED: Now sets player's own skull for Friends menu item!
  */
 public class PlayerConnectionListener implements Listener {
 
@@ -74,11 +76,6 @@ public class PlayerConnectionListener implements Listener {
         // Set up tab list
         if (plugin.getLobbyConfig().getTabListConfig().isEnabled()) {
             tabListManager.updatePlayer(player);
-        }
-
-        // Set up tab list
-        if (plugin.getLobbyConfig().getTabListConfig().isEnabled()) {
-            tabListManager.updatePlayer(player);
 
             // SET INITIAL TAB LIST NAME WITH RANK ICON
             var corePlugin = plugin.getCorePlugin();
@@ -114,6 +111,7 @@ public class PlayerConnectionListener implements Listener {
 
     /**
      * Gives join items to the player.
+     * UPDATED: Now sets player's own skull for Friends menu item!
      */
     private void giveJoinItems(Player player) {
         var joinItemsConfig = plugin.getLobbyConfig().getJoinItemsConfig();
@@ -132,14 +130,37 @@ public class PlayerConnectionListener implements Listener {
             try {
                 Material material = Material.valueOf(itemConfig.getMaterial());
 
-                ItemStack item = new ItemBuilder(material)
-                        .name(plugin.getMiniMessage().deserialize(itemConfig.getName()))
-                        .lore(itemConfig.getLore().stream()
-                                .map(line -> plugin.getMiniMessage().deserialize(line))
-                                .toList())
-                        .build();
+                // Special handling for PLAYER_HEAD - set to player's own skull
+                if (material == Material.PLAYER_HEAD) {
+                    ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
 
-                player.getInventory().setItem(itemConfig.getSlot(), item);
+                    // Set the skull owner to the player
+                    if (skull.getItemMeta() instanceof SkullMeta skullMeta) {
+                        skullMeta.setOwningPlayer(player);
+
+                        // Set display name
+                        skullMeta.displayName(plugin.getMiniMessage().deserialize(itemConfig.getName()));
+
+                        // Set lore
+                        skullMeta.lore(itemConfig.getLore().stream()
+                                .map(line -> plugin.getMiniMessage().deserialize(line))
+                                .toList());
+
+                        skull.setItemMeta(skullMeta);
+                    }
+
+                    player.getInventory().setItem(itemConfig.getSlot(), skull);
+                } else {
+                    // Regular item (not a player head)
+                    ItemStack item = new ItemBuilder(material)
+                            .name(plugin.getMiniMessage().deserialize(itemConfig.getName()))
+                            .lore(itemConfig.getLore().stream()
+                                    .map(line -> plugin.getMiniMessage().deserialize(line))
+                                    .toList())
+                            .build();
+
+                    player.getInventory().setItem(itemConfig.getSlot(), item);
+                }
             } catch (IllegalArgumentException e) {
                 plugin.getLogger().warning("Invalid material: " + itemConfig.getMaterial());
             }

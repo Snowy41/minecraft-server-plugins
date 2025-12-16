@@ -10,6 +10,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.logging.Logger;
 
 /**
  * Configuration loader for lobby settings.
@@ -47,6 +48,10 @@ public class LobbyConfig {
     }
 
     public static LobbyConfig load(File dataFolder) {
+        return load(dataFolder, Logger.getLogger("LobbyPlugin"));
+    }
+
+    public static LobbyConfig load(File dataFolder, Logger logger) {
         File configFile = new File(dataFolder, "config.yml");
 
         try {
@@ -61,7 +66,7 @@ public class LobbyConfig {
             ScoreboardConfig scoreboard = loadScoreboard(root.node("scoreboard"));
             TabListConfig tabList = loadTabList(root.node("tablist"));
             GUIConfig gui = loadGUI(root.node("gui"));
-            JoinItemsConfig joinItems = loadJoinItems(root.node("join-items"));
+            JoinItemsConfig joinItems = loadJoinItems(root.node("join-items"), logger); // Pass logger
             CosmeticsConfig cosmetics = loadCosmetics(root.node("cosmetics"));
             MessagesConfig messages = loadMessages(root.node("messages"));
 
@@ -159,25 +164,86 @@ public class LobbyConfig {
         );
     }
 
-    private static JoinItemsConfig loadJoinItems(CommentedConfigurationNode node) {
+    /**
+     * FIXED: Load join items with better error handling and logging
+     */
+    private static JoinItemsConfig loadJoinItems(CommentedConfigurationNode node, Logger logger) {
         List<JoinItem> items = new ArrayList<>();
 
-        node.node("items").childrenList().forEach(itemNode -> {
-            int slot = itemNode.node("slot").getInt(0);
-            String material = itemNode.node("material").getString("STONE");
-            String name = itemNode.node("name").getString("");
+        boolean enabled = node.node("enabled").getBoolean(true);
+        boolean clearInventory = node.node("clear-inventory").getBoolean(true);
 
-            List<String> lore = new ArrayList<>();
-            itemNode.node("lore").childrenList().forEach(l -> lore.add(l.getString("")));
+        logger.info("Loading join items from config...");
+        logger.info("Join items enabled: " + enabled);
+        logger.info("Clear inventory: " + clearInventory);
 
-            items.add(new JoinItem(slot, material, name, lore));
-        });
+        CommentedConfigurationNode itemsNode = node.node("items");
 
-        return new JoinItemsConfig(
-                node.node("enabled").getBoolean(true),
-                node.node("clear-inventory").getBoolean(true),
-                items
-        );
+        if (itemsNode.virtual()) {
+            logger.warning("No 'items' section found in join-items config!");
+            return new JoinItemsConfig(enabled, clearInventory, items);
+        }
+
+        // Get all item nodes
+        List<? extends CommentedConfigurationNode> itemNodes = itemsNode.childrenList();
+        logger.info("Found " + itemNodes.size() + " item(s) in config");
+
+        int itemIndex = 0;
+        for (CommentedConfigurationNode itemNode : itemNodes) {
+            itemIndex++;
+
+            try {
+                // Get values with defaults and logging
+                int slot = itemNode.node("slot").getInt(-1);
+                String material = itemNode.node("material").getString("");
+                String name = itemNode.node("name").getString("");
+
+                logger.info("  Item #" + itemIndex + ":");
+                logger.info("    Slot: " + slot);
+                logger.info("    Material: " + material);
+                logger.info("    Name: " + name);
+
+                // Validate required fields
+                if (slot < 0 || slot > 40) {
+                    logger.warning("    ⚠ Invalid slot " + slot + ", skipping item");
+                    continue;
+                }
+
+                if (material.isEmpty()) {
+                    logger.warning("    ⚠ Missing material, skipping item");
+                    continue;
+                }
+
+                // Load lore
+                List<String> lore = new ArrayList<>();
+                CommentedConfigurationNode loreNode = itemNode.node("lore");
+
+                if (!loreNode.virtual()) {
+                    for (CommentedConfigurationNode loreLineNode : loreNode.childrenList()) {
+                        String loreLine = loreLineNode.getString("");
+                        if (!loreLine.isEmpty()) {
+                            lore.add(loreLine);
+                        }
+                    }
+                }
+
+                logger.info("    Lore lines: " + lore.size());
+
+                // Create item
+                JoinItem item = new JoinItem(slot, material, name, lore);
+                items.add(item);
+
+                logger.info("    ✓ Item loaded successfully");
+
+            } catch (Exception e) {
+                logger.warning("  ⚠ Failed to load item #" + itemIndex + ": " + e.getMessage());
+                e.printStackTrace();
+            }
+        }
+
+        logger.info("Successfully loaded " + items.size() + " join item(s)");
+
+        return new JoinItemsConfig(enabled, clearInventory, items);
     }
 
     private static CosmeticsConfig loadCosmetics(CommentedConfigurationNode node) {

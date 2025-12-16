@@ -1,0 +1,110 @@
+# BattleRoyale Plugin Configuration
+# Version: 1.0.0
+
+# Game Settings
+game:
+  # Player limits
+  min-players: 25      # Minimum players to start
+  max-players: 100     # Maximum players per game
+
+  # Countdown before game starts
+  countdown-seconds: 30
+
+  # Pre-game lobby (above the map)
+  pregame-lobby:
+    height: 320          # Y level of lobby (above build limit)
+    platforms: 8         # Number of spawn platforms
+    transparent-floor: true
+
+  # Deathmatch settings
+  deathmatch:
+    enabled: true
+    time-limit: 3600     # Force deathmatch after 1 hour (seconds)
+    arena-size: 50       # 50x50 blocks arena
+    force-pvp: true
+
+# World Generation
+world:
+  size: 2000             # 2000x2000 blocks (radius from center)
+  border-type: WORLD_BORDER
+  generation:
+    seed: random         # "random" or specific seed number
+    custom-structures: true
+    structures:
+      - pregame_lobby
+      - deathmatch_arena
+      - supply_drop_platform
+
+# Zone System
+zone:
+  grace-period: 120      # 2 minutes before first shrink (seconds)
+  phases: 8              # Number of shrinking phases
+
+  # Damage outside zone
+  damage-per-tick: 1.0   # HP per tick (increases each phase)
+
+  # Visual indicators
+  indicator:
+    type: PARTICLES      # PARTICLES, WORLD_BORDER, or BOTH
+    particle: BARRIER
+
+# Loot System
+loot:
+  chests:
+    spawn-rate: 0.7      # 70% of possible chest locations
+    refill: false        # Don't refill chests during game
+
+  supply-drops:
+    enabled: true
+    interval: 300        # Every 5 minutes (seconds)
+    announce: true
+
+# Team System (Future)
+teams:
+  enabled: false         # Solo mode only for now
+  sizes:
+    - 2  # Duos
+    - 4  # Squads
+
+# Statistics
+statistics:
+  enabled: true
+  storage: json          # json or mysql
+  save-on-death: true
+  save-on-win: true
+
+  tracked:
+    - placement
+    - kills
+    - damage_dealt
+    - damage_taken
+    - time_survived
+    - distance_traveled
+
+# Messages (MiniMessage format)
+messages:
+  prefix: "<gradient:#FF4500:#DC143C>[BattleRoyale]</gradient> "
+
+  # Game states
+  game-starting: "<yellow>Game starting in <white>{seconds} <yellow>seconds..."
+  game-started: "<green>Game started! <white>Good luck!"
+  game-ending: "<gold>Game over! Winner: <white>{winner}"
+
+  # Player actions
+  player-eliminated: "<red>{player} <gray>was eliminated! <yellow>{remaining} <gray>players remaining"
+  you-eliminated: "<red>You were eliminated! <gray>Place: <yellow>#{placement}"
+
+  # Zone
+  zone-shrinking: "<yellow>⚠ Zone shrinking! <white>Move to the safe area!"
+  zone-damage: "<red>❤ You are outside the zone! <white>Take damage!"
+
+  # Deathmatch
+  deathmatch-starting: "<gold><bold>DEATHMATCH</bold> <white>Teleporting to arena..."
+  deathmatch-active: "<red><bold>FIGHT!</bold> <white>No more hiding!"
+
+# Debug
+debug:
+  enabled: false
+  log-player-actions: false
+  log-zone-updates: false
+  log-game-state-changes: true

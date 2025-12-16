@@ -1,0 +1,63 @@
+name: BattleRoyalePlugin
+version: '${version}'
+main: com.yourserver.battleroyale.BattleRoyalePlugin
+api-version: '1.21'
+author: MCBZH
+description: Battle Royale game mode with 25-100 players
+
+# Dependencies
+depend:
+  - APIModule
+  - CorePlugin
+
+# Soft dependencies
+softdepend:
+  - LobbyPlugin
+  - SocialPlugin
+
+# Load order
+load: STARTUP
+
+commands:
+  battleroyale:
+    description: Battle Royale management commands
+    usage: /<command> [join|leave|stats|admin]
+    permission: battleroyale.use
+    aliases: [br, game]
+
+  brstats:
+    description: View your battle royale statistics
+    usage: /<command> [player]
+    permission: battleroyale.stats
+    aliases: [brs, gamestats]
+
+permissions:
+  battleroyale.admin:
+    description: Access to all battle royale features
+    default: op
+    children:
+      battleroyale.use: true
+      battleroyale.stats: true
+      battleroyale.admin.create: true
+      battleroyale.admin.delete: true
+      battleroyale.admin.forcestart: true
+
+  battleroyale.use:
+    description: Join and play battle royale
+    default: true
+
+  battleroyale.stats:
+    description: View statistics
+    default: true
+
+  battleroyale.admin.create:
+    description: Create games
+    default: op
+
+  battleroyale.admin.delete:
+    description: Delete games
+    default: op
+
+  battleroyale.admin.forcestart:
+    description: Force start games
+    default: op

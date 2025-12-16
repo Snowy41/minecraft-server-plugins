@@ -14,3 +14,4 @@ project(":partition").name = "PartitionPlugin"
 include("npc-plugin")
 include("social-plugin")
 include("social-plugin-velocity")
+include("battleroyale")

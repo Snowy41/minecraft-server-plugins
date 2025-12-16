@@ -1,54 +1,59 @@
 package com.yourserver.battleroyale.arena;
 
+import be.seeseemelk.mockbukkit.MockBukkit;
+import be.seeseemelk.mockbukkit.ServerMock;
+import be.seeseemelk.mockbukkit.WorldMock;
 import org.bukkit.Location;
-import org.bukkit.World;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.*;
-import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for Arena system.
+ * Fixed with MockBukkit for proper World mocking.
  */
 class ArenaTest {
 
-    @Mock
-    private World mockWorld;
-
+    private ServerMock server;
+    private WorldMock world;
     private Location center;
     private Arena.ArenaConfig config;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
-        center = new Location(mockWorld, 0, 100, 0);
+        server = MockBukkit.mock();
+        world = server.addSimpleWorld("arena_world");
+        center = new Location(world, 0, 100, 0);
         config = Arena.ArenaConfig.createDefault();
+    }
+
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
     }
 
     @Test
     void constructor_withValidData_createsArena() {
         // Act
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Assert
         assertNotNull(arena);
         assertEquals("test-1", arena.getId());
         assertEquals("Test Arena", arena.getName());
-        assertEquals(mockWorld, arena.getWorld());
+        assertEquals(world, arena.getWorld());
         assertEquals(1000, arena.getSize());
     }
 
     @Test
     void addSpawnPoint_withValidLocation_addsToList() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        Location spawnPoint = new Location(mockWorld, 100, 100, 100);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
+        Location spawnPoint = new Location(world, 100, 100, 100);
 
         // Act
         arena.addSpawnPoint(spawnPoint);
@@ -60,9 +65,8 @@ class ArenaTest {
     @Test
     void addLootChestLocation_withValidLocation_addsToList() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        Location lootLocation = new Location(mockWorld, 200, 100, 200);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
+        Location lootLocation = new Location(world, 200, 100, 200);
 
         // Act
         arena.addLootChestLocation(lootLocation);
@@ -74,7 +78,7 @@ class ArenaTest {
     @Test
     void getRandomSpawnPoint_withNoSpawns_returnsCenter() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         Location spawn = arena.getRandomSpawnPoint();
@@ -88,9 +92,8 @@ class ArenaTest {
     @Test
     void getRandomSpawnPoint_withSpawns_returnsSpawnPoint() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        Location spawnPoint = new Location(mockWorld, 100, 100, 100);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
+        Location spawnPoint = new Location(world, 100, 100, 100);
         arena.addSpawnPoint(spawnPoint);
 
         // Act
@@ -105,7 +108,7 @@ class ArenaTest {
     @Test
     void getSpawnPoints_withCount_returnsRequestedNumber() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         List<Location> spawns = arena.getSpawnPoints(25);
@@ -117,7 +120,7 @@ class ArenaTest {
     @Test
     void getSpawnPoints_generatesCircularPattern() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         List<Location> spawns = arena.getSpawnPoints(8);
@@ -133,12 +136,11 @@ class ArenaTest {
     @Test
     void getLootChestLocations_withSpawnRate_returnsSubset() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Add 10 loot locations
         for (int i = 0; i < 10; i++) {
-            arena.addLootChestLocation(new Location(mockWorld, i * 10, 100, i * 10));
+            arena.addLootChestLocation(new Location(world, i * 10, 100, i * 10));
         }
 
         // Act - 50% spawn rate
@@ -151,9 +153,8 @@ class ArenaTest {
     @Test
     void isInArena_withLocationInside_returnsTrue() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        Location insideLocation = new Location(mockWorld, 100, 100, 100);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
+        Location insideLocation = new Location(world, 100, 100, 100);
 
         // Act
         boolean result = arena.isInArena(insideLocation);
@@ -165,9 +166,8 @@ class ArenaTest {
     @Test
     void isInArena_withLocationOutside_returnsFalse() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 500, config);
-        Location outsideLocation = new Location(mockWorld, 1000, 100, 1000);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 500, config);
+        Location outsideLocation = new Location(world, 1000, 100, 1000);
 
         // Act
         boolean result = arena.isInArena(outsideLocation);
@@ -179,9 +179,8 @@ class ArenaTest {
     @Test
     void getDistanceToEdge_withLocationInside_returnsPositive() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
-        Location insideLocation = new Location(mockWorld, 100, 100, 0);
-        when(mockWorld.equals(mockWorld)).thenReturn(true);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
+        Location insideLocation = new Location(world, 100, 100, 0);
 
         // Act
         double distance = arena.getDistanceToEdge(insideLocation);
@@ -193,7 +192,7 @@ class ArenaTest {
     @Test
     void getPregameLobbyCenter_returnsElevatedLocation() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         Location lobbyCenter = arena.getPregameLobbyCenter();
@@ -207,7 +206,7 @@ class ArenaTest {
     @Test
     void getDeathmatchCenter_returnsCenterLocation() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         Location dmCenter = arena.getDeathmatchCenter();
@@ -232,7 +231,7 @@ class ArenaTest {
     @Test
     void toString_returnsFormattedString() {
         // Arrange
-        Arena arena = new Arena("test-1", "Test Arena", mockWorld, center, 1000, config);
+        Arena arena = new Arena("test-1", "Test Arena", world, center, 1000, config);
 
         // Act
         String result = arena.toString();

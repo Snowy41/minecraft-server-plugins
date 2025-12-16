@@ -1,5 +1,6 @@
 package com.yourserver.battleroyale;
 
+import com.yourserver.battleroyale.command.BattleRoyaleCommand;
 import com.yourserver.battleroyale.config.BattleRoyaleConfig;
 import com.yourserver.battleroyale.game.GameManager;
 import com.yourserver.battleroyale.listener.GameListener;
@@ -37,6 +38,7 @@ public class BattleRoyalePlugin extends JavaPlugin {
     private MiniMessage miniMessage;
     private BattleRoyaleConfig config;
     private GameManager gameManager;
+    private GameListener gameListener;
 
     @Override
     public void onLoad() {
@@ -70,18 +72,22 @@ public class BattleRoyalePlugin extends JavaPlugin {
             getLogger().info("✓ Game manager initialized");
 
             // 5. Register listeners
+            gameListener = new GameListener(this, gameManager);
+
             getServer().getPluginManager().registerEvents(
                     new PlayerConnectionListener(this, gameManager),
                     this
             );
             getServer().getPluginManager().registerEvents(
-                    new GameListener(this, gameManager),
+                    gameListener,
                     this
             );
             getLogger().info("✓ Event listeners registered");
 
             // 6. Register commands
-            // TODO: Register commands
+            BattleRoyaleCommand brCommand = new BattleRoyaleCommand(this, gameManager);
+            getCommand("battleroyale").setExecutor(brCommand);
+            getCommand("battleroyale").setTabCompleter(brCommand);
             getLogger().info("✓ Commands registered");
 
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -135,5 +141,9 @@ public class BattleRoyalePlugin extends JavaPlugin {
 
     public GameManager getGameManager() {
         return gameManager;
+    }
+
+    public GameListener getGameListener() {
+        return gameListener;
     }
 }

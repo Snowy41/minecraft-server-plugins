@@ -1,7 +1,10 @@
 package com.yourserver.battleroyale.loot;
 
+import be.seeseemelk.mockbukkit.MockBukkit;
+import be.seeseemelk.mockbukkit.ServerMock;
 import org.bukkit.Material;
 import org.bukkit.inventory.ItemStack;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -11,14 +14,24 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for Loot system.
+ * Fixed with proper MockBukkit initialization.
  */
 class LootTableTest {
 
+    private ServerMock server;
     private LootTable lootTable;
 
     @BeforeEach
     void setUp() {
+        // Initialize MockBukkit server
+        server = MockBukkit.mock();
         lootTable = new LootTable();
+    }
+
+    @AfterEach
+    void tearDown() {
+        // Clean up MockBukkit
+        MockBukkit.unmock();
     }
 
     @Test

@@ -1,16 +1,18 @@
 package com.yourserver.battleroyale.game;
 
+import be.seeseemelk.mockbukkit.MockBukkit;
+import be.seeseemelk.mockbukkit.ServerMock;
+import be.seeseemelk.mockbukkit.WorldMock;
 import com.yourserver.battleroyale.BattleRoyalePlugin;
 import com.yourserver.battleroyale.arena.Arena;
 import com.yourserver.battleroyale.player.GamePlayer;
 import org.bukkit.Location;
-import org.bukkit.World;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.mockito.Mock;
-import org.mockito.MockitoAnnotations;
 
 import java.util.UUID;
+import java.util.logging.Logger;
 
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
@@ -18,28 +20,31 @@ import static org.mockito.Mockito.*;
 /**
  * Integration tests for the complete game flow.
  * Tests interaction between Game, Zone, Arena, and Loot systems.
+ * Fixed with proper MockBukkit and mocked dependencies.
  */
 class GameIntegrationTest {
 
-    @Mock
+    private ServerMock server;
     private BattleRoyalePlugin mockPlugin;
-
-    @Mock
-    private World mockWorld;
-
+    private WorldMock world;
     private GameConfig config;
 
     @BeforeEach
     void setUp() {
-        MockitoAnnotations.openMocks(this);
+        server = MockBukkit.mock();
+        world = server.addSimpleWorld("game_world");
+
+        // Mock the plugin (can't load full plugin in test)
+        mockPlugin = mock(BattleRoyalePlugin.class);
+        when(mockPlugin.getLogger()).thenReturn(Logger.getLogger("TestLogger"));
 
         // Create test configuration
         config = GameConfig.createDefault();
+    }
 
-        // Mock plugin logger
-        when(mockPlugin.getLogger()).thenReturn(
-                java.util.logging.Logger.getLogger("TestLogger")
-        );
+    @AfterEach
+    void tearDown() {
+        MockBukkit.unmock();
     }
 
     @Test
@@ -69,11 +74,11 @@ class GameIntegrationTest {
     void gameWithArena_initializesSystemsCorrectly() {
         // Arrange
         Game game = new Game("test-game", mockPlugin, config);
-        Location center = new Location(mockWorld, 0, 100, 0);
+        Location center = new Location(world, 0, 100, 0);
         Arena arena = new Arena(
                 "test-arena",
                 "Test Arena",
-                mockWorld,
+                world,
                 center,
                 1000,
                 Arena.ArenaConfig.createDefault()

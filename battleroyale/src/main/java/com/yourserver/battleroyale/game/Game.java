@@ -1,10 +1,15 @@
 package com.yourserver.battleroyale.game;
 
 import com.yourserver.battleroyale.BattleRoyalePlugin;
+import com.yourserver.battleroyale.arena.Arena;
+import com.yourserver.battleroyale.arena.DeathmatchArena;
+import com.yourserver.battleroyale.arena.PregameLobby;
+import com.yourserver.battleroyale.loot.LootManager;
 import com.yourserver.battleroyale.player.GamePlayer;
 import com.yourserver.battleroyale.zone.ZoneManager;
-import com.yourserver.battleroyale.loot.LootManager;
-import com.yourserver.battleroyale.arena.Arena;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
+import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
@@ -57,6 +62,8 @@ public class Game {
     // Game systems
     private ZoneManager zoneManager;
     private LootManager lootManager;
+    private PregameLobby pregameLobby;
+    private DeathmatchArena deathmatchArena;
 
     // Winner
     private UUID winner;
@@ -107,6 +114,22 @@ public class Game {
     private void onStarting() {
         // Start countdown timer
         plugin.getLogger().info("Game " + id + " starting countdown...");
+
+        // Build pre-game lobby if arena is set
+        if (arena != null && pregameLobby == null) {
+            pregameLobby = PregameLobby.createDefault(arena.getCenter());
+            pregameLobby.build();
+            plugin.getLogger().info("Pre-game lobby built for game " + id);
+
+            // Teleport all players to lobby
+            int spawnIndex = 0;
+            for (UUID uuid : players.keySet()) {
+                org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
+                if (player != null) {
+                    pregameLobby.teleportPlayer(player, spawnIndex++);
+                }
+            }
+        }
     }
 
     private void onActive() {
@@ -115,6 +138,33 @@ public class Game {
 
         // Initialize alive players
         alivePlayers.addAll(players.keySet());
+
+        // Teleport players to map spawn points
+        if (arena != null) {
+            List<org.bukkit.Location> spawnPoints = arena.getSpawnPoints(players.size());
+            int i = 0;
+            for (UUID uuid : players.keySet()) {
+                org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
+                if (player != null && i < spawnPoints.size()) {
+                    player.teleport(spawnPoints.get(i++));
+
+                    // Send game start message
+                    player.sendMessage(Component.empty());
+                    player.sendMessage(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.GOLD));
+                    player.sendMessage(Component.text("  ⚔ GAME START!", NamedTextColor.GREEN, TextDecoration.BOLD));
+                    player.sendMessage(Component.empty());
+                    player.sendMessage(Component.text("  Survive and be the last one standing!", NamedTextColor.GRAY));
+                    player.sendMessage(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.GOLD));
+                    player.sendMessage(Component.empty());
+                }
+            }
+        }
+
+        // Remove pre-game lobby
+        if (pregameLobby != null) {
+            pregameLobby.remove();
+            pregameLobby = null;
+        }
 
         // Start zone system
         if (arena != null && zoneManager != null) {
@@ -127,22 +177,72 @@ public class Game {
             lootManager.spawnLoot(arena);
             plugin.getLogger().info("Loot spawned for game " + id);
         }
-
-        // TODO: Start game duration timer
     }
 
     private void onDeathmatch() {
         plugin.getLogger().info("Game " + id + " entering DEATHMATCH phase!");
 
-        // TODO: Teleport remaining players to deathmatch arena
-        // TODO: Remove zone damage
-        // TODO: Force PvP
+        // Build deathmatch arena
+        if (arena != null && deathmatchArena == null) {
+            deathmatchArena = DeathmatchArena.createDefault(arena.getCenter());
+            deathmatchArena.build();
+            plugin.getLogger().info("Deathmatch arena built for game " + id);
+        }
+
+        // Teleport remaining players to deathmatch arena
+        if (deathmatchArena != null) {
+            int spawnIndex = 0;
+            for (UUID uuid : alivePlayers) {
+                org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
+                if (player != null) {
+                    deathmatchArena.teleportPlayer(player, spawnIndex++);
+
+                    player.sendMessage(Component.empty());
+                    player.sendMessage(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.RED));
+                    player.sendMessage(Component.text("  ⚔ ", NamedTextColor.RED, TextDecoration.BOLD)
+                            .append(Component.text("DEATHMATCH", NamedTextColor.GOLD, TextDecoration.BOLD)));
+                    player.sendMessage(Component.empty());
+                    player.sendMessage(Component.text("  No more hiding - FIGHT!", NamedTextColor.GRAY));
+                    player.sendMessage(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.RED));
+                    player.sendMessage(Component.empty());
+                }
+            }
+        }
+
+        // Stop zone damage
+        if (zoneManager != null) {
+            zoneManager.stop();
+        }
     }
 
     private void onEnding() {
         this.endedAt = Instant.now();
         plugin.getLogger().info("Game " + id + " is ENDING. Winner: " +
                 (winner != null ? Bukkit.getOfflinePlayer(winner).getName() : "NONE"));
+
+        // Announce winner to all players
+        if (winner != null) {
+            org.bukkit.entity.Player winnerPlayer = Bukkit.getPlayer(winner);
+            String winnerName = winnerPlayer != null ? winnerPlayer.getName() : "Unknown";
+
+            Component winMessage = Component.empty()
+                    .append(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.GOLD))
+                    .append(Component.newline())
+                    .append(Component.text("  👑 ", NamedTextColor.YELLOW, TextDecoration.BOLD))
+                    .append(Component.text("VICTORY ROYALE!", NamedTextColor.GOLD, TextDecoration.BOLD))
+                    .append(Component.newline())
+                    .append(Component.newline())
+                    .append(Component.text("  Winner: ", NamedTextColor.GRAY))
+                    .append(Component.text(winnerName, NamedTextColor.YELLOW, TextDecoration.BOLD))
+                    .append(Component.newline())
+                    .append(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.GOLD));
+
+            for (org.bukkit.entity.Player player : getOnlinePlayers()) {
+                player.sendMessage(Component.empty());
+                player.sendMessage(winMessage);
+                player.sendMessage(Component.empty());
+            }
+        }
 
         // Stop zone system
         if (zoneManager != null) {
@@ -154,10 +254,22 @@ public class Game {
             lootManager.clearLoot();
         }
 
-        // TODO: Display winner
-        // TODO: Save statistics
+        // Remove pre-game lobby
+        if (pregameLobby != null) {
+            pregameLobby.remove();
+            pregameLobby = null;
+        }
+
+        // Remove deathmatch arena
+        if (deathmatchArena != null) {
+            deathmatchArena.remove();
+            deathmatchArena = null;
+        }
+
+        // TODO: Display detailed statistics
+        // TODO: Save statistics to database
         // TODO: Reward players
-        // TODO: Schedule cleanup
+        // TODO: Schedule cleanup and world deletion
     }
 
     // ===== PLAYER MANAGEMENT =====
@@ -214,8 +326,23 @@ public class Game {
             GamePlayer player = players.get(uuid);
             if (player != null) {
                 player.setAlive(false);
+                player.setPlacement(alivePlayers.size() + 1);
+
                 plugin.getLogger().info("Player " + player.getName() + " eliminated. " +
                         "Remaining: " + alivePlayers.size());
+
+                // Show elimination message
+                org.bukkit.entity.Player bukkitPlayer = Bukkit.getPlayer(uuid);
+                if (bukkitPlayer != null) {
+                    bukkitPlayer.sendMessage(Component.empty());
+                    bukkitPlayer.sendMessage(Component.text("☠ ", NamedTextColor.RED, TextDecoration.BOLD)
+                            .append(Component.text("You were eliminated!", NamedTextColor.RED)));
+                    bukkitPlayer.sendMessage(Component.text("  Placement: ", NamedTextColor.GRAY)
+                            .append(Component.text("#" + player.getPlacement(), NamedTextColor.YELLOW)));
+                    bukkitPlayer.sendMessage(Component.text("  Kills: ", NamedTextColor.GRAY)
+                            .append(Component.text(player.getKills(), NamedTextColor.WHITE)));
+                    bukkitPlayer.sendMessage(Component.empty());
+                }
             }
 
             // Check if game should end
@@ -251,9 +378,11 @@ public class Game {
         }
 
         // Time limit reached (1 hour)
-        long elapsedMillis = System.currentTimeMillis() - startedAt.toEpochMilli();
-        if (elapsedMillis >= gameDuration) {
-            return true;
+        if (startedAt != null) {
+            long elapsedMillis = System.currentTimeMillis() - startedAt.toEpochMilli();
+            if (elapsedMillis >= gameDuration) {
+                return true;
+            }
         }
 
         // Zone has reached final phase
@@ -289,6 +418,16 @@ public class Game {
     @Nullable
     public LootManager getLootManager() {
         return lootManager;
+    }
+
+    @Nullable
+    public PregameLobby getPregameLobby() {
+        return pregameLobby;
+    }
+
+    @Nullable
+    public DeathmatchArena getDeathmatchArena() {
+        return deathmatchArena;
     }
 
     // ===== GETTERS =====

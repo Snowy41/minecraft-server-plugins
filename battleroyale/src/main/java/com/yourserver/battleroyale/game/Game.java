@@ -2,6 +2,9 @@ package com.yourserver.battleroyale.game;
 
 import com.yourserver.battleroyale.BattleRoyalePlugin;
 import com.yourserver.battleroyale.player.GamePlayer;
+import com.yourserver.battleroyale.zone.ZoneManager;
+import com.yourserver.battleroyale.loot.LootManager;
+import com.yourserver.battleroyale.arena.Arena;
 import org.bukkit.Bukkit;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
@@ -38,6 +41,7 @@ public class Game {
 
     // World and arena
     private World gameWorld;
+    private Arena arena;
     private GameConfig config;
 
     // Players
@@ -49,6 +53,10 @@ public class Game {
     private final int minPlayers;
     private final int maxPlayers;
     private final long gameDuration; // milliseconds (1 hour default)
+
+    // Game systems
+    private ZoneManager zoneManager;
+    private LootManager lootManager;
 
     // Winner
     private UUID winner;
@@ -70,6 +78,10 @@ public class Game {
         this.minPlayers = config.getMinPlayers();
         this.maxPlayers = config.getMaxPlayers();
         this.gameDuration = config.getGameDuration();
+
+        // Initialize game systems
+        this.zoneManager = new ZoneManager(plugin, this);
+        this.lootManager = new LootManager(plugin);
     }
 
     // ===== STATE MANAGEMENT =====
@@ -104,7 +116,18 @@ public class Game {
         // Initialize alive players
         alivePlayers.addAll(players.keySet());
 
-        // TODO: Start zone shrinking
+        // Start zone system
+        if (arena != null && zoneManager != null) {
+            zoneManager.start(arena.getCenter(), arena.getSize());
+            plugin.getLogger().info("Zone system started for game " + id);
+        }
+
+        // Spawn loot chests
+        if (arena != null && lootManager != null) {
+            lootManager.spawnLoot(arena);
+            plugin.getLogger().info("Loot spawned for game " + id);
+        }
+
         // TODO: Start game duration timer
     }
 
@@ -120,6 +143,16 @@ public class Game {
         this.endedAt = Instant.now();
         plugin.getLogger().info("Game " + id + " is ENDING. Winner: " +
                 (winner != null ? Bukkit.getOfflinePlayer(winner).getName() : "NONE"));
+
+        // Stop zone system
+        if (zoneManager != null) {
+            zoneManager.stop();
+        }
+
+        // Clear loot
+        if (lootManager != null) {
+            lootManager.clearLoot();
+        }
 
         // TODO: Display winner
         // TODO: Save statistics
@@ -223,9 +256,39 @@ public class Game {
             return true;
         }
 
-        // TODO: Check zone size (very small = trigger deathmatch)
+        // Zone has reached final phase
+        if (zoneManager != null && zoneManager.shouldTriggerDeathmatch()) {
+            return true;
+        }
 
         return false;
+    }
+
+    // ===== ARENA MANAGEMENT =====
+
+    /**
+     * Sets the arena for this game.
+     */
+    public void setArena(@NotNull Arena arena) {
+        this.arena = Objects.requireNonNull(arena);
+        plugin.getLogger().info("Arena set for game " + id + ": " + arena.getName());
+    }
+
+    @Nullable
+    public Arena getArena() {
+        return arena;
+    }
+
+    // ===== SYSTEM GETTERS =====
+
+    @Nullable
+    public ZoneManager getZoneManager() {
+        return zoneManager;
+    }
+
+    @Nullable
+    public LootManager getLootManager() {
+        return lootManager;
     }
 
     // ===== GETTERS =====

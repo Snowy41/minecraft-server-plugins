@@ -7,28 +7,22 @@ import java.io.File;
 import java.io.IOException;
 
 /**
- * Configuration loader for database settings.
- * Parses database.yml and provides typed configuration objects.
+ * Configuration loader - REDIS ONLY VERSION
+ * MySQL configuration removed, only Redis remains.
  */
 public class DatabaseConfig {
 
-    private final MySQLConfig mySQLConfig;
     private final RedisConfig redisConfig;
 
-    private DatabaseConfig(MySQLConfig mySQLConfig, RedisConfig redisConfig) {
-        this.mySQLConfig = mySQLConfig;
+    private DatabaseConfig(RedisConfig redisConfig) {
         this.redisConfig = redisConfig;
     }
 
     /**
-     * Loads database configuration from file.
-     *
-     * @param dataFolder Plugin data folder
-     * @return Loaded configuration
-     * @throws RuntimeException if configuration cannot be loaded
+     * Loads Redis-only configuration from redis.yml
      */
-    public static DatabaseConfig load(File dataFolder) {
-        File configFile = new File(dataFolder, "database.yml");
+    public static DatabaseConfig loadRedisOnly(File dataFolder) {
+        File configFile = new File(dataFolder, "redis.yml");
 
         try {
             YamlConfigurationLoader loader = YamlConfigurationLoader.builder()
@@ -36,30 +30,13 @@ public class DatabaseConfig {
                     .build();
 
             CommentedConfigurationNode root = loader.load();
-
-            MySQLConfig mysql = loadMySQL(root.node("mysql"));
             RedisConfig redis = loadRedis(root.node("redis"));
 
-            return new DatabaseConfig(mysql, redis);
+            return new DatabaseConfig(redis);
 
         } catch (IOException e) {
-            throw new RuntimeException("Failed to load database.yml", e);
+            throw new RuntimeException("Failed to load redis.yml", e);
         }
-    }
-
-    private static MySQLConfig loadMySQL(CommentedConfigurationNode node) {
-        return new MySQLConfig(
-                node.node("host").getString("localhost"),
-                node.node("port").getInt(3306),
-                node.node("database").getString("minecraft_server"),
-                node.node("username").getString("minecraft"),
-                node.node("password").getString("password"),
-                node.node("pool", "maximum-pool-size").getInt(10),
-                node.node("pool", "minimum-idle").getInt(2),
-                node.node("pool", "connection-timeout").getLong(30000),
-                node.node("pool", "idle-timeout").getLong(600000),
-                node.node("pool", "max-lifetime").getLong(1800000)
-        );
     }
 
     private static RedisConfig loadRedis(CommentedConfigurationNode node) {
@@ -71,62 +48,11 @@ public class DatabaseConfig {
         );
     }
 
-    public MySQLConfig getMySQLConfig() {
-        return mySQLConfig;
-    }
-
     public RedisConfig getRedisConfig() {
         return redisConfig;
     }
 
-    /**
-     * MySQL connection configuration.
-     */
-    public static class MySQLConfig {
-        private final String host;
-        private final int port;
-        private final String database;
-        private final String username;
-        private final String password;
-        private final int maximumPoolSize;
-        private final int minimumIdle;
-        private final long connectionTimeout;
-        private final long idleTimeout;
-        private final long maxLifetime;
-
-        public MySQLConfig(String host, int port, String database, String username, String password,
-                           int maximumPoolSize, int minimumIdle, long connectionTimeout,
-                           long idleTimeout, long maxLifetime) {
-            this.host = host;
-            this.port = port;
-            this.database = database;
-            this.username = username;
-            this.password = password;
-            this.maximumPoolSize = maximumPoolSize;
-            this.minimumIdle = minimumIdle;
-            this.connectionTimeout = connectionTimeout;
-            this.idleTimeout = idleTimeout;
-            this.maxLifetime = maxLifetime;
-        }
-
-        public String getHost() { return host; }
-        public int getPort() { return port; }
-        public String getDatabase() { return database; }
-        public String getUsername() { return username; }
-        public String getPassword() { return password; }
-        public int getMaximumPoolSize() { return maximumPoolSize; }
-        public int getMinimumIdle() { return minimumIdle; }
-        public long getConnectionTimeout() { return connectionTimeout; }
-        public long getIdleTimeout() { return idleTimeout; }
-        public long getMaxLifetime() { return maxLifetime; }
-
-        public String getJdbcUrl() {
-            return String.format(
-                    "jdbc:mysql://%s:%d/%s?useSSL=false&serverTimezone=UTC&allowPublicKeyRetrieval=true",
-                    host, port, database
-            );
-        }
-    }
+    // REMOVED: MySQLConfig class - no longer needed
 
     /**
      * Redis connection configuration.

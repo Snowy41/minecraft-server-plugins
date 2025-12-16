@@ -1,0 +1,20 @@
+# Redis Configuration
+# CorePlugin now uses JSON for player data storage
+# Redis is ONLY used for cross-server messaging
+
+redis:
+  # Redis Cloud connection
+  host: "redis-13511.crce218.eu-central-1-1.ec2.cloud.redislabs.com"
+  port: 13511
+  password: "TUdVa4lhKdpQDIiI5ynKrb3ylzllqmmp"
+
+  # Key prefix for this server network
+  key-prefix: "mcserver:"
+
+  # Pub/Sub channels for cross-server communication
+  channels:
+    server-heartbeat: "server:heartbeat"
+    game-state: "game:state"
+    player-queue: "player:queue"
+    player-stats: "player:stats"
+    server-command: "server:command"

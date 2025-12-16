@@ -4,14 +4,11 @@ import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
 import com.yourserver.social.database.JSONClanRepository;
-import com.yourserver.social.database.MySQLClanRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Clan;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
-
 import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.CompletableFuture;

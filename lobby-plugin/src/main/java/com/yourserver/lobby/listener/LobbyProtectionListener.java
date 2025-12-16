@@ -17,7 +17,6 @@ import org.bukkit.inventory.ItemStack;
 /**
  * Enhanced lobby protection listener for 1.21.8
  *
- * NEW FEATURES:
  * - Death prevention (instant respawn at spawn)
  * - Mob spawning prevention (friendly + hostile)
  * - Comprehensive interaction blocking
@@ -63,7 +62,11 @@ public class LobbyProtectionListener implements Listener {
         }
 
         Material type = item.getType();
-        return type == Material.COMPASS || type == Material.NETHER_STAR;
+
+        // FIXED: Also check for PLAYER_HEAD (friends menu)
+        return type == Material.COMPASS ||
+                type == Material.NETHER_STAR ||
+                type == Material.PLAYER_HEAD;
     }
 
     // ===== EXISTING METHODS (UNCHANGED) =====
@@ -144,10 +147,13 @@ public class LobbyProtectionListener implements Listener {
             }
         }
 
+        // FIXED: Inverted the logic - cancel when PvP is DISABLED (true in config)
         if (attacker != null && config.getProtectionConfig().isPvp()) {
             event.setCancelled(true);
+            return; // FIXED: Added return to prevent further processing
         }
     }
+
 
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onPlayerDamage(EntityDamageEvent event) {
@@ -458,12 +464,17 @@ public class LobbyProtectionListener implements Listener {
 
         ItemStack item = event.getItem();
 
+        // Allow lobby items
         if (isLobbyItem(item)) {
             return;
         }
 
+        // FIXED: Cancel ALL other interactions
         if (event.hasBlock() || event.hasItem()) {
             event.setCancelled(true);
+            // FIXED: Also set useItemInHand and useInteractedBlock to DENY
+            event.setUseItemInHand(org.bukkit.event.Event.Result.DENY);
+            event.setUseInteractedBlock(org.bukkit.event.Event.Result.DENY);
         }
     }
 

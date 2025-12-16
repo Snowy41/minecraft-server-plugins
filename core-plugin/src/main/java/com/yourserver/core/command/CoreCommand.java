@@ -72,16 +72,10 @@ public class CoreCommand implements CommandExecutor, TabCompleter {
             return;
         }
 
-        boolean dbConnected = plugin.getDatabaseManager().isConnected();
         boolean redisConnected = plugin.getRedisManager().isConnected();
 
         sender.sendMessage(Component.text("=== Core Plugin Status ===")
                 .color(NamedTextColor.GOLD));
-
-        sender.sendMessage(Component.text("Database: ")
-                .color(NamedTextColor.GRAY)
-                .append(Component.text(dbConnected ? "Connected" : "Disconnected")
-                        .color(dbConnected ? NamedTextColor.GREEN : NamedTextColor.RED)));
 
         sender.sendMessage(Component.text("Redis: ")
                 .color(NamedTextColor.GRAY)
@@ -108,11 +102,6 @@ public class CoreCommand implements CommandExecutor, TabCompleter {
         long maxMemory = runtime.maxMemory() / 1024 / 1024;
 
         sender.sendMessage(Component.text("Memory: " + usedMemory + "MB / " + maxMemory + "MB")
-                .color(NamedTextColor.GRAY));
-
-        // Show database config
-        sender.sendMessage(Component.text("Database Host: " +
-                        plugin.getDatabaseConfig().getMySQLConfig().getHost())
                 .color(NamedTextColor.GRAY));
 
         sender.sendMessage(Component.text("Redis Host: " +

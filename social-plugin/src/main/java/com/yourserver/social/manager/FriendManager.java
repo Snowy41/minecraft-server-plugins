@@ -5,7 +5,6 @@ import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
 import com.yourserver.social.database.JSONClanRepository;
 import com.yourserver.social.database.JSONFriendRepository;
-import com.yourserver.social.database.MySQLFriendRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Friend;
 import com.yourserver.social.model.FriendRequest;

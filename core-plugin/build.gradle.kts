@@ -25,8 +25,6 @@ dependencies {
 
     // Database
     implementation("com.zaxxer:HikariCP:5.1.0")
-    implementation("com.mysql:mysql-connector-j:8.3.0")
-
     // Redis
     implementation("io.lettuce:lettuce-core:6.2.7.RELEASE")
 

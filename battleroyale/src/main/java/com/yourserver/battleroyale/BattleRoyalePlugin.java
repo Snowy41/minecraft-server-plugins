@@ -8,6 +8,8 @@ import com.yourserver.battleroyale.listener.PlayerConnectionListener;
 import com.yourserver.core.CorePlugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.plugin.java.JavaPlugin;
+import com.yourserver.battleroyale.listener.MinimalProtectionListener;
+
 
 import java.util.logging.Level;
 
@@ -80,6 +82,10 @@ public class BattleRoyalePlugin extends JavaPlugin {
             );
             getServer().getPluginManager().registerEvents(
                     gameListener,
+                    this
+            );
+            getServer().getPluginManager().registerEvents(
+                    new MinimalProtectionListener(gameManager),
                     this
             );
             getLogger().info("✓ Event listeners registered");

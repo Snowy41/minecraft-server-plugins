@@ -6,11 +6,13 @@ import com.yourserver.battleroyale.arena.DeathmatchArena;
 import com.yourserver.battleroyale.arena.PregameLobby;
 import com.yourserver.battleroyale.loot.LootManager;
 import com.yourserver.battleroyale.player.GamePlayer;
+import com.yourserver.battleroyale.player.SpectatorManager;
 import com.yourserver.battleroyale.zone.ZoneManager;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
+import org.bukkit.Location;
 import org.bukkit.World;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -64,6 +66,8 @@ public class Game {
     private LootManager lootManager;
     private PregameLobby pregameLobby;
     private DeathmatchArena deathmatchArena;
+    private GameScheduler scheduler;
+    private SpectatorManager spectatorManager;
 
     // Winner
     private UUID winner;
@@ -89,6 +93,8 @@ public class Game {
         // Initialize game systems
         this.zoneManager = new ZoneManager(plugin, this);
         this.lootManager = new LootManager(plugin);
+        this.scheduler = new GameScheduler(plugin, this);
+        this.spectatorManager = new SpectatorManager(this);
     }
 
     // ===== STATE MANAGEMENT =====
@@ -102,17 +108,39 @@ public class Game {
 
         plugin.getLogger().info("Game " + id + " state: " + oldState + " → " + newState);
 
+        // Notify scheduler of state change
+        if (scheduler != null) {
+            scheduler.onStateChange(newState);
+        }
+
         // Handle state entry
         switch (newState) {
-            case STARTING -> onStarting();
+            case STARTING -> {
+                onStarting();
+                // Start the scheduler (automatic countdown)
+                if (scheduler != null) {
+                    scheduler.start();
+                }
+            }
             case ACTIVE -> onActive();
-            case DEATHMATCH -> onDeathmatch();
-            case ENDING -> onEnding();
+            case DEATHMATCH -> {
+                onDeathmatch();
+                // Teleport spectators to watch deathmatch
+                if (deathmatchArena != null && spectatorManager != null) {
+                    spectatorManager.teleportSpectatorsToArena(deathmatchArena.getCenter());
+                }
+            }
+            case ENDING -> {
+                onEnding();
+                // Stop scheduler
+                if (scheduler != null) {
+                    scheduler.stop();
+                }
+            }
         }
     }
 
     private void onStarting() {
-        // Start countdown timer
         plugin.getLogger().info("Game " + id + " starting countdown...");
 
         // Build pre-game lobby if arena is set
@@ -130,6 +158,8 @@ public class Game {
                 }
             }
         }
+
+        // NOTE: Scheduler automatically starts countdown - no manual timer needed!
     }
 
     private void onActive() {
@@ -139,9 +169,9 @@ public class Game {
         // Initialize alive players
         alivePlayers.addAll(players.keySet());
 
-        // Teleport players to map spawn points
+        // Teleport players to spawn points on the map
         if (arena != null) {
-            List<org.bukkit.Location> spawnPoints = arena.getSpawnPoints(players.size());
+            List<Location> spawnPoints = arena.getSpawnPoints(players.size());
             int i = 0;
             for (UUID uuid : players.keySet()) {
                 org.bukkit.entity.Player player = Bukkit.getPlayer(uuid);
@@ -244,6 +274,11 @@ public class Game {
             }
         }
 
+        // Clean up spectators
+        if (spectatorManager != null) {
+            spectatorManager.clearAll();
+        }
+
         // Stop zone system
         if (zoneManager != null) {
             zoneManager.stop();
@@ -331,9 +366,14 @@ public class Game {
                 plugin.getLogger().info("Player " + player.getName() + " eliminated. " +
                         "Remaining: " + alivePlayers.size());
 
-                // Show elimination message
+                // Convert to spectator
                 org.bukkit.entity.Player bukkitPlayer = Bukkit.getPlayer(uuid);
                 if (bukkitPlayer != null) {
+                    if (spectatorManager != null) {
+                        spectatorManager.makeSpectator(bukkitPlayer);
+                    }
+
+                    // Show elimination message
                     bukkitPlayer.sendMessage(Component.empty());
                     bukkitPlayer.sendMessage(Component.text("☠ ", NamedTextColor.RED, TextDecoration.BOLD)
                             .append(Component.text("You were eliminated!", NamedTextColor.RED)));
@@ -428,6 +468,16 @@ public class Game {
     @Nullable
     public DeathmatchArena getDeathmatchArena() {
         return deathmatchArena;
+    }
+
+    @Nullable
+    public GameScheduler getScheduler() {
+        return scheduler;
+    }
+
+    @Nullable
+    public SpectatorManager getSpectatorManager() {
+        return spectatorManager;
     }
 
     // ===== GETTERS =====

@@ -4,27 +4,36 @@ import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.WorldMock;
 import org.bukkit.Location;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for Zone system.
- * Fixed with MockBukkit for proper World mocking.
+ * FIXED: Proper MockBukkit initialization - server/world are static,
+ * but center/testPhase are recreated per-test.
  */
 class ZoneTest {
 
-    private ServerMock server;
-    private WorldMock world;
+    private static ServerMock server;
+    private static WorldMock world;
+
     private Location center;
     private ZonePhase testPhase;
 
-    @BeforeEach
-    void setUp() {
+    @BeforeAll
+    static void setUpAll() {
         server = MockBukkit.mock();
         world = server.addSimpleWorld("zone_world");
+    }
+
+    @AfterAll
+    static void tearDownAll() {
+        MockBukkit.unmock();
+    }
+
+    @BeforeEach
+    void setUp() {
         center = new Location(world, 0, 100, 0);
 
         // Create test phase
@@ -36,11 +45,6 @@ class ZoneTest {
                 .damagePerTick(1.0)
                 .tickInterval(20)
                 .build();
-    }
-
-    @AfterEach
-    void tearDown() {
-        MockBukkit.unmock();
     }
 
     @Test

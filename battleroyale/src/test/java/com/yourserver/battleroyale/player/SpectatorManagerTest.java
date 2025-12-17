@@ -36,30 +36,25 @@ class SpectatorManagerTest {
         spectatorManager = new SpectatorManager(game);
         playerUuid = UUID.randomUUID();
 
-        when(player.getUniqueId()).thenReturn(playerUuid);
-        when(player.getName()).thenReturn("TestPlayer");
-        when(player.getLocation()).thenReturn(location);
-        when(player.getActivePotionEffects()).thenReturn(new ArrayList<>());
-        when(game.getAlivePlayers()).thenReturn(Collections.emptySet());
-        when(game.getOnlinePlayers()).thenReturn(Collections.emptyList());
-        when(game.getAliveCount()).thenReturn(0);
+        // Only stub the basics - use lenient to avoid UnnecessaryStubbingException
+        lenient().when(player.getUniqueId()).thenReturn(playerUuid);
+        lenient().when(player.getName()).thenReturn("TestPlayer");
+        lenient().when(player.getLocation()).thenReturn(location);
+        lenient().when(player.getActivePotionEffects()).thenReturn(new ArrayList<>());
+        lenient().when(game.getAlivePlayers()).thenReturn(Collections.emptySet());
+        lenient().when(game.getOnlinePlayers()).thenReturn(Collections.emptyList());
+        lenient().when(game.getAliveCount()).thenReturn(0);
     }
 
     @Test
     void testMakeSpectator() {
         spectatorManager.makeSpectator(player);
 
-        // Verify spectator mode set
         verify(player).setGameMode(GameMode.SPECTATOR);
-
-        // Verify flight enabled
         verify(player).setAllowFlight(true);
         verify(player).setFlying(true);
-
-        // Verify night vision added
         verify(player).addPotionEffect(any(PotionEffect.class));
 
-        // Verify player is tracked as spectator
         assertTrue(spectatorManager.isSpectator(playerUuid));
         assertEquals(1, spectatorManager.getSpectatorCount());
     }
@@ -69,10 +64,7 @@ class SpectatorManagerTest {
         spectatorManager.makeSpectator(player);
         spectatorManager.makeSpectator(player);
 
-        // Should only be one spectator (not duplicated)
         assertEquals(1, spectatorManager.getSpectatorCount());
-
-        // setGameMode should still only be called once on second call (early return)
         verify(player, times(1)).setGameMode(GameMode.SPECTATOR);
     }
 
@@ -97,7 +89,6 @@ class SpectatorManagerTest {
         spectatorManager.makeSpectator(player);
         assertEquals(1, spectatorManager.getSpectatorCount());
 
-        // Add second spectator
         Player player2 = mock(Player.class);
         UUID uuid2 = UUID.randomUUID();
         when(player2.getUniqueId()).thenReturn(uuid2);
@@ -114,19 +105,16 @@ class SpectatorManagerTest {
         spectatorManager.makeSpectator(player);
         spectatorManager.removeSpectator(player);
 
-        // Verify spectator mode cleared
         verify(player).setGameMode(GameMode.SURVIVAL);
         verify(player).setFlying(false);
         verify(player).setAllowFlight(false);
 
-        // Verify no longer tracked
         assertFalse(spectatorManager.isSpectator(playerUuid));
         assertEquals(0, spectatorManager.getSpectatorCount());
     }
 
     @Test
     void testClearAllWithNoSpectators() {
-        // Should not crash
         spectatorManager.clearAll();
         assertEquals(0, spectatorManager.getSpectatorCount());
     }
@@ -135,7 +123,6 @@ class SpectatorManagerTest {
     void testClearAllWithOneSpectator() {
         when(player.isOnline()).thenReturn(true);
 
-        // Mock static Bukkit.getPlayer
         try (var bukkit = mockStatic(org.bukkit.Bukkit.class)) {
             bukkit.when(() -> org.bukkit.Bukkit.getPlayer(playerUuid)).thenReturn(player);
 
@@ -173,10 +160,8 @@ class SpectatorManagerTest {
     void testSpectatePlayerWhenNotSpectator() {
         Player target = mock(Player.class);
 
-        // Player is not a spectator
         spectatorManager.spectatePlayer(player, target);
 
-        // Should do nothing (no teleport)
         verify(player, never()).teleport(any(Location.class));
     }
 
@@ -209,9 +194,7 @@ class SpectatorManagerTest {
         spectatorManager.makeSpectator(player);
         spectatorManager.spectatePlayer(player, target);
 
-        // Should send error message
         verify(player).sendActionBar(any(net.kyori.adventure.text.Component.class));
-        // Should not teleport
         verify(player, never()).teleport(any(Location.class));
     }
 

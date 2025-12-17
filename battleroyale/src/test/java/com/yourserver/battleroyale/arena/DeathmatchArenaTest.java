@@ -5,9 +5,7 @@ import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.WorldMock;
 import be.seeseemelk.mockbukkit.entity.PlayerMock;
 import org.bukkit.Location;
-import org.junit.jupiter.api.AfterEach;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
 import java.util.List;
 
@@ -15,25 +13,31 @@ import static org.junit.jupiter.api.Assertions.*;
 
 /**
  * Unit tests for DeathmatchArena.
- * Tests arena creation, player spawning, and boundaries.
+ * FIXED: Proper MockBukkit initialization - server/world are static,
+ * but center/arena are recreated per-test.
  */
 class DeathmatchArenaTest {
 
-    private ServerMock server;
-    private WorldMock world;
+    private static ServerMock server;
+    private static WorldMock world;
+
     private Location center;
     private DeathmatchArena arena;
 
-    @BeforeEach
-    void setUp() {
+    @BeforeAll
+    static void setUpAll() {
         server = MockBukkit.mock();
         world = server.addSimpleWorld("deathmatch_world");
-        center = new Location(world, 0, 100, 0);
     }
 
-    @AfterEach
-    void tearDown() {
+    @AfterAll
+    static void tearDownAll() {
         MockBukkit.unmock();
+    }
+
+    @BeforeEach
+    void setUp() {
+        center = new Location(world, 0, 100, 0);
     }
 
     @Test

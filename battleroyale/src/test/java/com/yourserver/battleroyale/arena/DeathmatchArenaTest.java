@@ -5,6 +5,8 @@ import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.WorldMock;
 import be.seeseemelk.mockbukkit.entity.PlayerMock;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -27,7 +29,9 @@ class DeathmatchArenaTest {
     @BeforeAll
     static void setUpAll() {
         server = MockBukkit.mock();
-        world = server.addSimpleWorld("deathmatch_world");
+        WorldCreator creator = new WorldCreator("deathmatch_world");
+        creator.environment(World.Environment.NORMAL);
+        world = server.addSimpleWorld(String.valueOf(creator));
     }
 
     @AfterAll

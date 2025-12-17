@@ -4,6 +4,8 @@ import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
 import be.seeseemelk.mockbukkit.WorldMock;
 import org.bukkit.Location;
+import org.bukkit.World;
+import org.bukkit.WorldCreator;
 import org.junit.jupiter.api.*;
 
 import java.util.List;
@@ -26,7 +28,9 @@ class ArenaTest {
     @BeforeAll
     static void setUpAll() {
         server = MockBukkit.mock();
-        world = server.addSimpleWorld("arena_world");
+        WorldCreator creator = new WorldCreator("arena_world");
+        creator.environment(World.Environment.NORMAL);
+        world = server.addSimpleWorld(String.valueOf(creator));
     }
 
     @AfterAll

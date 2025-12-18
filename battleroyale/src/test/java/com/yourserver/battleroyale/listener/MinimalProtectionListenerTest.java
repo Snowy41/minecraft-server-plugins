@@ -20,6 +20,13 @@ import java.util.UUID;
 import static org.junit.jupiter.api.Assertions.*;
 import static org.mockito.Mockito.*;
 
+/**
+ * Unit tests for MinimalProtectionListener.
+ *
+ * FIXED:
+ * - Added lenient() to avoid UnnecessaryStubbingException
+ * - Changed sendActionBar argument matcher from String to Component
+ */
 @ExtendWith(MockitoExtension.class)
 class MinimalProtectionListenerTest {
 
@@ -55,8 +62,10 @@ class MinimalProtectionListenerTest {
         listener = new MinimalProtectionListener(gameManager);
         playerUuid = UUID.randomUUID();
 
-        when(player.getUniqueId()).thenReturn(playerUuid);
-        when(gameManager.getPlayerGame(player)).thenReturn(game);
+        // Use lenient() to avoid UnnecessaryStubbingException
+        // These stubs are used by SOME tests, not all
+        lenient().when(player.getUniqueId()).thenReturn(playerUuid);
+        lenient().when(gameManager.getPlayerGame(player)).thenReturn(game);
     }
 
     // ===== BLOCK BREAK TESTS =====
@@ -69,7 +78,7 @@ class MinimalProtectionListenerTest {
         listener.onBlockBreak(blockBreakEvent);
 
         verify(blockBreakEvent).setCancelled(true);
-        verify(player).sendActionBar((String) any());
+        verify(player).sendActionBar(any(net.kyori.adventure.text.Component.class));
     }
 
     @Test
@@ -138,7 +147,7 @@ class MinimalProtectionListenerTest {
         listener.onPvP(pvpEvent);
 
         verify(pvpEvent).setCancelled(true);
-        verify(attacker).sendActionBar((String) any());
+        verify(attacker).sendActionBar(any(net.kyori.adventure.text.Component.class));
     }
 
     @Test

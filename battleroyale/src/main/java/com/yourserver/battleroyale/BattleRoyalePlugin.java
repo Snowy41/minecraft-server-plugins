@@ -1,6 +1,7 @@
 package com.yourserver.battleroyale;
 
 import com.yourserver.battleroyale.command.BattleRoyaleCommand;
+import com.yourserver.battleroyale.command.BattleRoyaleDebugCommand;
 import com.yourserver.battleroyale.config.BattleRoyaleConfig;
 import com.yourserver.battleroyale.game.GameManager;
 import com.yourserver.battleroyale.listener.GameListener;
@@ -94,7 +95,13 @@ public class BattleRoyalePlugin extends JavaPlugin {
             BattleRoyaleCommand brCommand = new BattleRoyaleCommand(this, gameManager);
             getCommand("battleroyale").setExecutor(brCommand);
             getCommand("battleroyale").setTabCompleter(brCommand);
+
+            BattleRoyaleDebugCommand debugCommand = new BattleRoyaleDebugCommand(this, gameManager);
+            getCommand("brdebug").setExecutor(debugCommand);
+            getCommand("brdebug").setTabCompleter(debugCommand);
+
             getLogger().info("✓ Commands registered");
+
 
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             getLogger().info("BattleRoyale Plugin enabled successfully!");

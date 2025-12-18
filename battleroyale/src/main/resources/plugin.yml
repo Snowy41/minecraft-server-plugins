@@ -31,6 +31,12 @@ commands:
     permission: battleroyale.stats
     aliases: [brs, gamestats]
 
+  brdebug:
+    description: Debug commands for testing Battle Royale functionality
+    usage: /<command> [lifecycle|state|info|zone|kill|win]
+    permission: battleroyale.admin.debug
+    aliases: [brd, btest]
+
 permissions:
   battleroyale.admin:
     description: Access to all battle royale features
@@ -41,6 +47,7 @@ permissions:
       battleroyale.admin.create: true
       battleroyale.admin.delete: true
       battleroyale.admin.forcestart: true
+      battleroyale.admin.debug: true
 
   battleroyale.use:
     description: Join and play battle royale
@@ -60,4 +67,8 @@ permissions:
 
   battleroyale.admin.forcestart:
     description: Force start games
+    default: op
+
+  battleroyale.admin.debug:
+    description: Use debug commands for testing
     default: op

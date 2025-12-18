@@ -1,12 +1,13 @@
 package com.yourserver.battleroyale.game;
 
-import com.yourserver.battleroyale.BattleRoyalePlugin;
+import com.yourserver.battleroyale.config.BattleRoyaleConfig;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.format.NamedTextColor;
 import net.kyori.adventure.text.format.TextDecoration;
 import org.bukkit.Bukkit;
 import org.bukkit.Sound;
 import org.bukkit.entity.Player;
+import org.bukkit.plugin.Plugin;
 import org.bukkit.scheduler.BukkitTask;
 import org.jetbrains.annotations.NotNull;
 
@@ -15,18 +16,13 @@ import java.util.logging.Level;
 /**
  * Game Scheduler - The "heartbeat" of the Battle Royale game.
  *
- * Responsibilities:
- * - Manages countdown timers (pre-game)
- * - Handles state transitions automatically
- * - Checks win conditions every second
- * - Triggers deathmatch when appropriate
- * - Coordinates with ZoneManager for zone progression
- *
- * This is the "brain" that makes the game run autonomously.
+ * REFACTORED: Now accepts Plugin + BattleRoyaleConfig separately,
+ * making it testable without BattleRoyalePlugin dependency.
  */
 public class GameScheduler {
 
-    private final BattleRoyalePlugin plugin;
+    private final Plugin plugin;
+    private final BattleRoyaleConfig config;
     private final Game game;
 
     // Scheduler tasks
@@ -40,14 +36,24 @@ public class GameScheduler {
     // Running state
     private boolean running = false;
 
-    public GameScheduler(@NotNull BattleRoyalePlugin plugin, @NotNull Game game) {
+    /**
+     * Constructor that accepts Plugin and Config separately (test-friendly).
+     */
+    public GameScheduler(@NotNull Plugin plugin, @NotNull BattleRoyaleConfig config, @NotNull Game game) {
         this.plugin = plugin;
+        this.config = config;
         this.game = game;
     }
 
     /**
+     * Constructor for production use (backwards compatibility).
+     */
+    public GameScheduler(@NotNull com.yourserver.battleroyale.BattleRoyalePlugin plugin, @NotNull Game game) {
+        this(plugin, plugin.getBRConfig(), game);
+    }
+
+    /**
      * Starts the scheduler based on current game state.
-     * This is the entry point for automation.
      */
     public void start() {
         if (running) {
@@ -57,14 +63,13 @@ public class GameScheduler {
 
         running = true;
 
-        // Start appropriate tasks based on game state
         switch (game.getState()) {
             case STARTING -> startCountdown();
             case ACTIVE, DEATHMATCH -> {
                 startGameTick();
                 startWinCheck();
             }
-            case WAITING, ENDING -> {} // No automation needed
+            case WAITING, ENDING -> {}
         }
 
         plugin.getLogger().info("GameScheduler started for game " + game.getId() + " (state: " + game.getState() + ")");
@@ -96,12 +101,8 @@ public class GameScheduler {
 
     // ===== COUNTDOWN PHASE =====
 
-    /**
-     * Starts the pre-game countdown.
-     * Shows countdown messages and transitions to ACTIVE when done.
-     */
     private void startCountdown() {
-        countdownSeconds = plugin.getBRConfig().getCountdownSeconds();
+        countdownSeconds = config.getCountdownSeconds();
 
         countdownTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || game.getState() != GameState.STARTING) {
@@ -109,7 +110,6 @@ public class GameScheduler {
                 return;
             }
 
-            // Countdown messages at specific intervals
             if (countdownSeconds == 30 || countdownSeconds == 15 || countdownSeconds == 10 ||
                     countdownSeconds == 5 || countdownSeconds == 4 || countdownSeconds == 3 ||
                     countdownSeconds == 2 || countdownSeconds == 1) {
@@ -117,7 +117,6 @@ public class GameScheduler {
                 announceCountdown(countdownSeconds);
             }
 
-            // Game starts!
             if (countdownSeconds == 0) {
                 stopCountdown();
                 startGame();
@@ -126,14 +125,11 @@ public class GameScheduler {
 
             countdownSeconds--;
 
-        }, 0L, 20L); // Run every second
+        }, 0L, 20L);
 
         plugin.getLogger().info("Started countdown for game " + game.getId() + " (" + countdownSeconds + " seconds)");
     }
 
-    /**
-     * Stops the countdown task.
-     */
     private void stopCountdown() {
         if (countdownTask != null) {
             countdownTask.cancel();
@@ -141,9 +137,6 @@ public class GameScheduler {
         }
     }
 
-    /**
-     * Announces countdown to all players.
-     */
     private void announceCountdown(int seconds) {
         NamedTextColor color = switch (seconds) {
             case 30, 15, 10 -> NamedTextColor.YELLOW;
@@ -165,31 +158,18 @@ public class GameScheduler {
         }
     }
 
-    /**
-     * Starts the game - transitions from STARTING to ACTIVE.
-     */
     private void startGame() {
         try {
-            // Transition game state
             game.setState(GameState.ACTIVE);
-
-            // Start game automation
             startGameTick();
             startWinCheck();
-
-            // Announce game start
             announceGameStart();
-
             plugin.getLogger().info("Game " + game.getId() + " started successfully!");
-
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE, "Failed to start game " + game.getId(), e);
         }
     }
 
-    /**
-     * Announces game start to all players.
-     */
     private void announceGameStart() {
         Component message = Component.empty()
                 .append(Component.text("⚔ ", NamedTextColor.GOLD, TextDecoration.BOLD))
@@ -206,12 +186,8 @@ public class GameScheduler {
         }
     }
 
-    // ===== GAME TICK (AUTOMATION) =====
+    // ===== GAME TICK =====
 
-    /**
-     * Main game tick - runs every second during active gameplay.
-     * Handles all periodic checks and automation.
-     */
     private void startGameTick() {
         gameTickTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || !game.getState().isInProgress()) {
@@ -220,27 +196,17 @@ public class GameScheduler {
             }
 
             try {
-                // Check if deathmatch should trigger
                 if (game.shouldTriggerDeathmatch() && game.getState() == GameState.ACTIVE) {
                     triggerDeathmatch();
                 }
-
-                // Additional periodic tasks can go here:
-                // - Update UI elements
-                // - Check for inactive players
-                // - Send periodic announcements
-
             } catch (Exception e) {
                 plugin.getLogger().log(Level.SEVERE,
                         "Error in game tick for game " + game.getId(), e);
             }
 
-        }, 20L, 20L); // Run every second
+        }, 20L, 20L);
     }
 
-    /**
-     * Stops the game tick task.
-     */
     private void stopGameTick() {
         if (gameTickTask != null) {
             gameTickTask.cancel();
@@ -248,28 +214,17 @@ public class GameScheduler {
         }
     }
 
-    /**
-     * Triggers deathmatch phase.
-     */
     private void triggerDeathmatch() {
         try {
             plugin.getLogger().info("Triggering deathmatch for game " + game.getId());
-
-            // Transition to deathmatch state
             game.setState(GameState.DEATHMATCH);
-
-            // Announce to players
             announceDeathmatch();
-
         } catch (Exception e) {
             plugin.getLogger().log(Level.SEVERE,
                     "Failed to trigger deathmatch for game " + game.getId(), e);
         }
     }
 
-    /**
-     * Announces deathmatch to all players.
-     */
     private void announceDeathmatch() {
         Component message = Component.empty()
                 .append(Component.text("⚔ ", NamedTextColor.RED, TextDecoration.BOLD))
@@ -286,12 +241,8 @@ public class GameScheduler {
         }
     }
 
-    // ===== WIN CONDITION CHECK =====
+    // ===== WIN CHECK =====
 
-    /**
-     * Checks for win conditions every second.
-     * Automatically ends game when only 1 player/team remains.
-     */
     private void startWinCheck() {
         winCheckTask = Bukkit.getScheduler().runTaskTimer(plugin, () -> {
             if (!running || !game.getState().isInProgress()) {
@@ -306,12 +257,9 @@ public class GameScheduler {
                         "Error checking win condition for game " + game.getId(), e);
             }
 
-        }, 20L, 20L); // Run every second
+        }, 20L, 20L);
     }
 
-    /**
-     * Stops the win check task.
-     */
     private void stopWinCheck() {
         if (winCheckTask != null) {
             winCheckTask.cancel();
@@ -319,39 +267,25 @@ public class GameScheduler {
         }
     }
 
-    /**
-     * Checks if game should end (win condition met).
-     */
     private void checkWinCondition() {
         int aliveCount = game.getAliveCount();
 
-        // Solo mode: 1 player remaining = winner
         if (aliveCount <= 1) {
             endGame();
             return;
         }
 
-        // Team mode: 1 team remaining = winner
-        // TODO: Implement team-based win checking
-
-        // No players left? End with no winner
         if (aliveCount == 0) {
             endGame();
         }
     }
 
-    /**
-     * Ends the game - transitions to ENDING state.
-     */
     private void endGame() {
         try {
             plugin.getLogger().info("Ending game " + game.getId() +
                     " (alive: " + game.getAliveCount() + ")");
 
-            // Stop all automation
             stop();
-
-            // Transition to ending state
             game.setState(GameState.ENDING);
 
         } catch (Exception e) {
@@ -362,21 +296,15 @@ public class GameScheduler {
 
     // ===== STATE MANAGEMENT =====
 
-    /**
-     * Called when game state changes.
-     * Adjusts automation accordingly.
-     */
     public void onStateChange(@NotNull GameState newState) {
         if (!running) {
             return;
         }
 
-        // Stop old tasks
         stopCountdown();
         stopGameTick();
         stopWinCheck();
 
-        // Start new tasks based on state
         switch (newState) {
             case STARTING -> startCountdown();
             case ACTIVE, DEATHMATCH -> {

@@ -2,8 +2,8 @@ package com.yourserver.battleroyale.game;
 
 import be.seeseemelk.mockbukkit.MockBukkit;
 import be.seeseemelk.mockbukkit.ServerMock;
-import com.yourserver.battleroyale.BattleRoyalePlugin;
 import com.yourserver.battleroyale.config.BattleRoyaleConfig;
+import org.bukkit.plugin.java.JavaPlugin;
 import org.junit.jupiter.api.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -12,14 +12,14 @@ import static org.mockito.Mockito.*;
 /**
  * Unit tests for GameScheduler.
  *
- * SOLUTION: Use MockBukkit + extend BattleRoyalePlugin with a test stub
- * that overrides the methods GameScheduler uses, avoiding CorePlugin dependency.
+ * NOW WORKING: GameScheduler refactored to accept Plugin + Config separately!
  */
 class GameSchedulerTest {
 
     private static ServerMock server;
     private Game game;
-    private BattleRoyalePlugin plugin;
+    private TestPlugin testPlugin;
+    private BattleRoyaleConfig config;
     private GameScheduler gameScheduler;
 
     @BeforeAll
@@ -36,11 +36,17 @@ class GameSchedulerTest {
     void setUp() {
         game = mock(Game.class);
 
-        // Create a test plugin that extends BattleRoyalePlugin
-        // but overrides methods to avoid CorePlugin dependency
-        plugin = MockBukkit.load(TestBattleRoyalePlugin.class);
+        // Load simple test plugin
+        testPlugin = MockBukkit.load(TestPlugin.class);
 
-        gameScheduler = new GameScheduler(plugin, game);
+        // Create mock config
+        config = mock(BattleRoyaleConfig.class);
+        when(config.getCountdownSeconds()).thenReturn(30);
+        when(config.getMinPlayers()).thenReturn(25);
+        when(config.getMaxPlayers()).thenReturn(100);
+
+        // Create GameScheduler with new test-friendly constructor
+        gameScheduler = new GameScheduler(testPlugin, config, game);
     }
 
     @AfterEach
@@ -59,6 +65,7 @@ class GameSchedulerTest {
     @Test
     void testSchedulerStartWithStartingState() {
         when(game.getState()).thenReturn(GameState.STARTING);
+        when(game.getId()).thenReturn("test-game");
 
         gameScheduler.start();
 
@@ -69,6 +76,7 @@ class GameSchedulerTest {
     @Test
     void testSchedulerStartWithActiveState() {
         when(game.getState()).thenReturn(GameState.ACTIVE);
+        when(game.getId()).thenReturn("test-game");
 
         gameScheduler.start();
 
@@ -78,6 +86,8 @@ class GameSchedulerTest {
     @Test
     void testSchedulerStop() {
         when(game.getState()).thenReturn(GameState.STARTING);
+        when(game.getId()).thenReturn("test-game");
+
         gameScheduler.start();
         assertTrue(gameScheduler.isRunning());
 
@@ -89,7 +99,9 @@ class GameSchedulerTest {
     @Test
     void testOnStateChangeToStarting() {
         when(game.getState()).thenReturn(GameState.STARTING);
+        when(game.getId()).thenReturn("test-game");
 
+        gameScheduler.start();
         gameScheduler.onStateChange(GameState.STARTING);
 
         assertNotNull(gameScheduler);
@@ -98,7 +110,9 @@ class GameSchedulerTest {
     @Test
     void testOnStateChangeToActive() {
         when(game.getState()).thenReturn(GameState.ACTIVE);
+        when(game.getId()).thenReturn("test-game");
 
+        gameScheduler.start();
         gameScheduler.onStateChange(GameState.ACTIVE);
 
         assertNotNull(gameScheduler);
@@ -107,7 +121,9 @@ class GameSchedulerTest {
     @Test
     void testOnStateChangeToDeathmatch() {
         when(game.getState()).thenReturn(GameState.DEATHMATCH);
+        when(game.getId()).thenReturn("test-game");
 
+        gameScheduler.start();
         gameScheduler.onStateChange(GameState.DEATHMATCH);
 
         assertNotNull(gameScheduler);
@@ -115,6 +131,10 @@ class GameSchedulerTest {
 
     @Test
     void testOnStateChangeToEnding() {
+        when(game.getId()).thenReturn("test-game");
+        when(game.getState()).thenReturn(GameState.ACTIVE); // Need state before start()
+
+        gameScheduler.start();
         gameScheduler.onStateChange(GameState.ENDING);
 
         assertNotNull(gameScheduler);
@@ -124,6 +144,7 @@ class GameSchedulerTest {
     @Test
     void testMultipleStartStopCycles() {
         when(game.getState()).thenReturn(GameState.STARTING);
+        when(game.getId()).thenReturn("test-game");
 
         // Cycle 1
         gameScheduler.start();
@@ -142,6 +163,7 @@ class GameSchedulerTest {
 
     @Test
     void testStopWithoutStart() {
+        when(game.getId()).thenReturn("test-game");
         assertFalse(gameScheduler.isRunning());
 
         gameScheduler.stop();
@@ -152,6 +174,8 @@ class GameSchedulerTest {
 
     @Test
     void testStateTransitionSequence() {
+        when(game.getId()).thenReturn("test-game");
+
         // WAITING
         when(game.getState()).thenReturn(GameState.WAITING);
         gameScheduler.onStateChange(GameState.WAITING);
@@ -159,6 +183,7 @@ class GameSchedulerTest {
 
         // STARTING
         when(game.getState()).thenReturn(GameState.STARTING);
+        gameScheduler.start();
         gameScheduler.onStateChange(GameState.STARTING);
 
         // ACTIVE
@@ -178,44 +203,12 @@ class GameSchedulerTest {
     }
 
     /**
-     * Test implementation of BattleRoyalePlugin.
-     *
-     * This extends the real BattleRoyalePlugin but overrides methods
-     * to avoid the CorePlugin dependency and prevent onEnable() from running.
+     * Simple test plugin - just needs to extend JavaPlugin.
      */
-    public static class TestBattleRoyalePlugin extends BattleRoyalePlugin {
-        private final BattleRoyaleConfig config;
-
-        public TestBattleRoyalePlugin() {
-            // Create a mock config with default values
-            this.config = mock(BattleRoyaleConfig.class);
-            when(config.getCountdownSeconds()).thenReturn(30);
-            when(config.getMinPlayers()).thenReturn(25);
-            when(config.getMaxPlayers()).thenReturn(100);
-        }
-
-        @Override
-        public void onLoad() {
-            // Skip normal onLoad to avoid CorePlugin dependency
-        }
-
+    public static class TestPlugin extends JavaPlugin {
         @Override
         public void onEnable() {
-            // Skip normal onEnable to avoid CorePlugin dependency
-            getLogger().info("Test plugin enabled (skipping normal initialization)");
+            getLogger().info("TestPlugin enabled");
         }
-
-        @Override
-        public void onDisable() {
-            // Skip normal onDisable
-        }
-
-        @Override
-        public BattleRoyaleConfig getBRConfig() {
-            return config;
-        }
-
-        // All other methods will use the parent class implementation
-        // or MockBukkit's defaults, which is fine for testing GameScheduler
     }
 }

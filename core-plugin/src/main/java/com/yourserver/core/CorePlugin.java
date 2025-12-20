@@ -3,143 +3,366 @@ package com.yourserver.core;
 import com.yourserver.api.messaging.RedisMessenger;
 import com.yourserver.core.buildmode.BuildModeManager;
 import com.yourserver.core.config.DatabaseConfig;
-import com.yourserver.core.database.json.JSONPlayerDataRepository;
-import com.yourserver.core.database.json.JSONPlayerStatsRepository;
+import com.yourserver.core.database.DatabaseManager;
+import com.yourserver.core.database.mysql.MySQLPlayerDataRepository;
+import com.yourserver.core.database.mysql.MySQLPlayerStatsRepository;
 import com.yourserver.core.player.PlayerDataManager;
 import com.yourserver.core.rank.RankDisplayManager;
 import com.yourserver.core.redis.RedisManager;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import java.sql.SQLException;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
- * Core plugin providing essential infrastructure - REDESIGNED FOR JSON STORAGE
+ * CorePlugin - FULLY MODERNIZED FOR MYSQL + CLOUDNET 4.0
  *
- * CHANGES FROM ORIGINAL:
- * - Removed MySQL dependency (DatabaseManager completely removed)
- * - Uses JSON files for player data (like SocialPlugin)
- * - Still uses Redis for cross-server messaging
- * - Much simpler, no database connection issues!
+ * KEY IMPROVEMENTS:
+ * ✅ MySQL database with HikariCP (replaces JSON)
+ * ✅ Async operations (non-blocking)
+ * ✅ Connection pooling (scalable)
+ * ✅ Auto-reconnect on failure
+ * ✅ Batch operations for performance
+ * ✅ Health monitoring
+ * ✅ CloudNet service detection
+ * ✅ Redis pub/sub messaging
+ * ✅ Proper error handling
+ * ✅ Graceful shutdown
+ * ✅ Thread-safe caching
+ * ✅ ACID database transactions
  *
- * Data Storage:
- * - Player data: plugins/CorePlugin/data/players.json
- * - Player stats: plugins/CorePlugin/data/player-stats.json
- * - Redis: Cross-server messaging only (no persistent storage)
+ * ARCHITECTURE:
+ * - DatabaseManager: HikariCP connection pool
+ * - Repositories: Clean data access layer
+ * - PlayerDataManager: Caffeine cache + async saves
+ * - RedisManager: Cross-server messaging
+ * - Scheduled tasks: Auto-save, health checks
+ *
+ * @author MCBZH
+ * @version 2.0.0 - MySQL Edition
  */
 public class CorePlugin extends JavaPlugin {
 
-    // REMOVED: private DatabaseManager databaseManager;
+    // ===== CORE MANAGERS =====
+    private DatabaseManager databaseManager;
     private RedisManager redisManager;
     private PlayerDataManager playerDataManager;
-    private DatabaseConfig databaseConfig; // Only used for Redis config now
     private BuildModeManager buildModeManager;
     private RankDisplayManager rankDisplayManager;
 
-    // NEW: JSON repositories
-    private JSONPlayerDataRepository playerDataRepository;
-    private JSONPlayerStatsRepository playerStatsRepository;
+    // ===== CONFIGURATION =====
+    private DatabaseConfig databaseConfig;
 
+    // ===== REPOSITORIES (MySQL) =====
+    private MySQLPlayerDataRepository playerDataRepository;
+    private MySQLPlayerStatsRepository playerStatsRepository;
+
+    // ===== ASYNC EXECUTION =====
+    private ScheduledExecutorService asyncExecutor;
+
+    // ===== CLOUDNET INFO =====
+    private String serviceName;
+    private String serviceGroup;
+    private boolean isCloudNetService;
+
+    // ===== LIFECYCLE: LOAD =====
     @Override
     public void onLoad() {
-        getLogger().info("Loading CorePlugin (JSON Storage Mode)...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  CorePlugin v" + getDescription().getVersion() + "                  ║");
+        getLogger().info("║  MySQL + Redis + CloudNet Ready        ║");
+        getLogger().info("╚════════════════════════════════════════╝");
 
-        // Only save redis.yml now (removed database.yml)
-        saveResource("redis.yml", false);
+        // Save default configuration files
+        saveDefaultConfig();
+        saveResource("database.yml", false);
+
+        // Detect CloudNet environment
+        detectCloudNetService();
     }
 
+    // ===== LIFECYCLE: ENABLE =====
     @Override
     public void onEnable() {
-        getLogger().info("Enabling CorePlugin (JSON Storage Mode)...");
+        long startTime = System.currentTimeMillis();
 
         try {
-            // 1. Load Redis configuration (no more MySQL config)
-            databaseConfig = DatabaseConfig.loadRedisOnly(getDataFolder());
-            getLogger().info("✓ Redis configuration loaded");
+            // === PHASE 1: INITIALIZATION ===
+            getLogger().info("Starting initialization sequence...");
 
-            // 2. Initialize JSON repositories (NO DATABASE!)
-            playerDataRepository = new JSONPlayerDataRepository(getDataFolder(), getLogger());
-            playerStatsRepository = new JSONPlayerStatsRepository(getDataFolder(), getLogger());
-            getLogger().info("✓ JSON repositories initialized");
-            getLogger().info("  - Data stored in: plugins/CorePlugin/data/");
+            initializeThreadPool();
+            getLogger().info("✓ Thread pool ready");
 
-            // 3. Initialize Redis manager
-            redisManager = new RedisManager(getLogger());
-            redisManager.initialize(databaseConfig.getRedisConfig());
-            getLogger().info("✓ Redis connection established");
+            loadConfiguration();
+            getLogger().info("✓ Configuration loaded");
 
-            // 4. Initialize player data manager (now uses JSON)
-            playerDataManager = new PlayerDataManager(playerDataRepository, playerStatsRepository);
-            getLogger().info("✓ Player data manager initialized (JSON mode)");
+            // === PHASE 2: DATABASE ===
+            initializeDatabase();
+            getLogger().info("✓ MySQL connected (" + databaseManager.getPoolStats() + ")");
 
-            // 5. Initialize other managers
+            // === PHASE 3: REDIS (Optional) ===
+            initializeRedis();
+            if (redisManager != null && redisManager.isConnected()) {
+                getLogger().info("✓ Redis connected");
+            } else {
+                getLogger().warning("⚠ Redis disabled (cross-server features unavailable)");
+            }
+
+            // === PHASE 4: REPOSITORIES & MANAGERS ===
+            initializeRepositories();
+            getLogger().info("✓ Repositories initialized");
+
+            playerDataManager = new PlayerDataManager(
+                    playerDataRepository,
+                    playerStatsRepository
+            );
+            getLogger().info("✓ Player data manager ready");
+
             buildModeManager = new BuildModeManager();
             rankDisplayManager = new RankDisplayManager(getLogger());
-            getLogger().info("✓ All managers initialized");
+            getLogger().info("✓ Auxiliary managers ready");
 
-            // 6. Register listeners
-            getServer().getPluginManager().registerEvents(
-                    new com.yourserver.core.listener.PlayerConnectionListener(playerDataManager),
-                    this
-            );
-            getServer().getPluginManager().registerEvents(
-                    new com.yourserver.core.listener.BuildModeListener(buildModeManager),
-                    this
-            );
+            // === PHASE 5: LISTENERS & COMMANDS ===
+            registerListeners();
             getLogger().info("✓ Event listeners registered");
 
-            // 7. Register commands
-            getCommand("core").setExecutor(new com.yourserver.core.command.CoreCommand(this));
-            getCommand("build").setExecutor(new com.yourserver.core.command.BuildModeCommand(this, buildModeManager));
+            registerCommands();
             getLogger().info("✓ Commands registered");
 
-            getLogger().info("CorePlugin enabled successfully (JSON mode)!");
-            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            getLogger().info("✓ NO DATABASE REQUIRED - All data stored in JSON");
-            getLogger().info("✓ Player data: plugins/CorePlugin/data/players.json");
-            getLogger().info("✓ Player stats: plugins/CorePlugin/data/player-stats.json");
-            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            // === PHASE 6: SCHEDULED TASKS ===
+            startPeriodicTasks();
+            getLogger().info("✓ Scheduled tasks started");
+
+            // === SUCCESS ===
+            long elapsed = System.currentTimeMillis() - startTime;
+            getLogger().info("╔════════════════════════════════════════╗");
+            getLogger().info("║  ✓ COREPLUGIN ENABLED SUCCESSFULLY     ║");
+            getLogger().info("╠════════════════════════════════════════╣");
+            if (isCloudNetService) {
+                getLogger().info("║  Service: " + String.format("%-28s", serviceName) + " ║");
+                getLogger().info("║  Group:   " + String.format("%-28s", serviceGroup) + " ║");
+            }
+            getLogger().info("║  Database: MySQL (HikariCP)            ║");
+            getLogger().info("║  Cache: Caffeine                       ║");
+            getLogger().info("║  Startup: " + elapsed + "ms" + " ".repeat(25 - String.valueOf(elapsed).length()) + "║");
+            getLogger().info("╚════════════════════════════════════════╝");
 
         } catch (Exception e) {
-            getLogger().log(Level.SEVERE, "Failed to enable CorePlugin!", e);
+            getLogger().log(Level.SEVERE, "╔════════════════════════════════════════╗", e);
+            getLogger().severe("║  ✗ STARTUP FAILED!                     ║");
+            getLogger().severe("║  Check logs for details                ║");
+            getLogger().severe("╚════════════════════════════════════════╝");
             getServer().getPluginManager().disablePlugin(this);
         }
     }
 
+    // ===== LIFECYCLE: DISABLE =====
     @Override
     public void onDisable() {
-        getLogger().info("Disabling CorePlugin...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  Shutting down CorePlugin...           ║");
+        getLogger().info("╚════════════════════════════════════════╝");
 
-        // Save all data before shutdown
+        // 1. Save all player data
         if (playerDataManager != null) {
-            getLogger().info("Saving all player data to JSON...");
-            playerDataManager.shutdown();
-            getLogger().info("✓ Player data saved");
+            getLogger().info("Saving all player data...");
+            try {
+                playerDataManager.shutdown();
+                getLogger().info("✓ Player data saved");
+            } catch (Exception e) {
+                getLogger().log(Level.SEVERE, "Failed to save player data!", e);
+            }
         }
 
+        // 2. Stop scheduled tasks
+        if (asyncExecutor != null && !asyncExecutor.isShutdown()) {
+            getLogger().info("Stopping scheduled tasks...");
+            asyncExecutor.shutdown();
+            try {
+                if (!asyncExecutor.awaitTermination(10, TimeUnit.SECONDS)) {
+                    asyncExecutor.shutdownNow();
+                }
+                getLogger().info("✓ Tasks stopped");
+            } catch (InterruptedException e) {
+                asyncExecutor.shutdownNow();
+                Thread.currentThread().interrupt();
+            }
+        }
+
+        // 3. Close Redis
         if (redisManager != null) {
+            getLogger().info("Closing Redis connection...");
             redisManager.shutdown();
-            getLogger().info("✓ Redis connection closed");
+            getLogger().info("✓ Redis closed");
         }
 
+        // 4. Close database
+        if (databaseManager != null) {
+            getLogger().info("Closing database connection...");
+            databaseManager.shutdown();
+            getLogger().info("✓ Database closed");
+        }
+
+        // 5. Cleanup other managers
         if (buildModeManager != null) {
             buildModeManager.shutdown();
-            getLogger().info("✓ Build mode manager shut down");
         }
 
-        getLogger().info("CorePlugin disabled successfully!");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  ✓ CorePlugin disabled successfully    ║");
+        getLogger().info("╚════════════════════════════════════════╝");
     }
 
-    /**
-     * Reloads the plugin configuration.
-     */
-    public void reloadConfiguration() {
-        databaseConfig = DatabaseConfig.loadRedisOnly(getDataFolder());
-        getLogger().info("Configuration reloaded");
+    // ===== INITIALIZATION METHODS =====
+
+    private void initializeThreadPool() {
+        int poolSize = Math.max(2, Runtime.getRuntime().availableProcessors() / 2);
+        this.asyncExecutor = Executors.newScheduledThreadPool(
+                poolSize,
+                runnable -> {
+                    Thread thread = new Thread(runnable, "CorePlugin-Async");
+                    thread.setDaemon(true);
+                    thread.setUncaughtExceptionHandler((t, e) ->
+                            getLogger().log(Level.SEVERE, "Uncaught exception in " + t.getName(), e)
+                    );
+                    return thread;
+                }
+        );
+        getLogger().fine("Thread pool created with " + poolSize + " threads");
     }
 
-    // ===== Public API for other plugins =====
+    private void loadConfiguration() {
+        this.databaseConfig = DatabaseConfig.load(getDataFolder());
 
-    // REMOVED: getDatabaseManager() - no longer exists!
+        if (!databaseConfig.hasMySQLConfig()) {
+            throw new RuntimeException("MySQL configuration not found in database.yml!");
+        }
+    }
+
+    private void initializeDatabase() throws SQLException {
+        this.databaseManager = new DatabaseManager(
+                getLogger(),
+                databaseConfig.getMySQLConfig()
+        );
+
+        this.databaseManager.initialize();
+
+        if (!databaseManager.isConnected()) {
+            throw new SQLException("Database connection test failed!");
+        }
+    }
+
+    private void initializeRedis() {
+        try {
+            this.redisManager = new RedisManager(getLogger());
+            this.redisManager.initialize(databaseConfig.getRedisConfig());
+            subscribeToCloudNetChannels();
+        } catch (Exception e) {
+            getLogger().log(Level.WARNING, "Redis initialization failed", e);
+            getLogger().warning("Continuing without Redis (cross-server features disabled)");
+            this.redisManager = null;
+        }
+    }
+
+    private void initializeRepositories() {
+        this.playerDataRepository = new MySQLPlayerDataRepository(
+                databaseManager.getDataSource(),
+                asyncExecutor,
+                getLogger()
+        );
+
+        this.playerStatsRepository = new MySQLPlayerStatsRepository(
+                databaseManager.getDataSource(),
+                asyncExecutor,
+                getLogger()
+        );
+    }
+
+    private void registerListeners() {
+        getServer().getPluginManager().registerEvents(
+                new com.yourserver.core.listener.PlayerConnectionListener(playerDataManager),
+                this
+        );
+
+        getServer().getPluginManager().registerEvents(
+                new com.yourserver.core.listener.BuildModeListener(buildModeManager),
+                this
+        );
+    }
+
+    private void registerCommands() {
+        getCommand("core").setExecutor(
+                new com.yourserver.core.command.CoreCommand(this)
+        );
+        getCommand("build").setExecutor(
+                new com.yourserver.core.command.BuildModeCommand(this, buildModeManager)
+        );
+    }
+
+    private void startPeriodicTasks() {
+        // Auto-save every 5 minutes
+        asyncExecutor.scheduleAtFixedRate(() -> {
+            try {
+                playerDataManager.saveAll().join();
+                getLogger().fine("Auto-save completed");
+            } catch (Exception e) {
+                getLogger().log(Level.WARNING, "Auto-save failed", e);
+            }
+        }, 5, 5, TimeUnit.MINUTES);
+
+        // Health check every 30 seconds
+        asyncExecutor.scheduleAtFixedRate(() -> {
+            if (!databaseManager.healthCheck()) {
+                getLogger().warning("⚠ Database health check failed!");
+            }
+        }, 30, 30, TimeUnit.SECONDS);
+
+        // Pool stats logging every 5 minutes (for monitoring)
+        asyncExecutor.scheduleAtFixedRate(() -> {
+            getLogger().info("Pool: " + databaseManager.getPoolStats());
+        }, 5, 5, TimeUnit.MINUTES);
+    }
+
+    private void detectCloudNetService() {
+        this.serviceName = System.getProperty("cloudnet.service.name");
+        this.serviceGroup = System.getProperty("cloudnet.service.group");
+        this.isCloudNetService = serviceName != null;
+
+        if (isCloudNetService) {
+            getLogger().info("Running on CloudNet: " + serviceName + " (" + serviceGroup + ")");
+        } else {
+            getLogger().info("Running in standalone mode");
+        }
+    }
+
+    private void subscribeToCloudNetChannels() {
+        if (redisManager == null || !redisManager.isConnected()) {
+            return;
+        }
+
+        redisManager.subscribe("player:join", message ->
+                getLogger().fine("Player joined server: " + message)
+        );
+
+        redisManager.subscribe("player:quit", message ->
+                getLogger().fine("Player quit server: " + message)
+        );
+
+        redisManager.subscribe("game:state", message ->
+                getLogger().fine("Game state update: " + message)
+        );
+
+        getLogger().info("Subscribed to CloudNet Redis channels");
+    }
+
+    // ===== PUBLIC API =====
+
+    public DatabaseManager getDatabaseManager() {
+        return databaseManager;
+    }
 
     public RedisManager getRedisManager() {
         return redisManager;
@@ -147,10 +370,6 @@ public class CorePlugin extends JavaPlugin {
 
     public PlayerDataManager getPlayerDataManager() {
         return playerDataManager;
-    }
-
-    public DatabaseConfig getDatabaseConfig() {
-        return databaseConfig;
     }
 
     public BuildModeManager getBuildModeManager() {
@@ -161,17 +380,39 @@ public class CorePlugin extends JavaPlugin {
         return rankDisplayManager;
     }
 
-    /**
-     * Gets the Redis messenger for cross-server communication.
-     */
     public RedisMessenger getRedisMessenger() {
         return redisManager;
     }
 
-    // NEW: Check if database is available (always returns false now)
-    @Deprecated
-    public boolean isDatabaseAvailable() {
-        getLogger().warning("isDatabaseAvailable() called - database support removed, using JSON");
-        return false;
+    public ScheduledExecutorService getAsyncExecutor() {
+        return asyncExecutor;
+    }
+
+    public DatabaseConfig getDatabaseConfig() {
+        return databaseConfig;
+    }
+
+    public String getServiceName() {
+        return serviceName;
+    }
+
+    public String getServiceGroup() {
+        return serviceGroup;
+    }
+
+    public boolean isCloudNetService() {
+        return isCloudNetService;
+    }
+
+    public void reloadConfiguration() {
+        reloadConfig();
+        databaseConfig = DatabaseConfig.load(getDataFolder());
+        getLogger().info("Configuration reloaded");
+    }
+
+    public boolean isHealthy() {
+        return databaseManager != null &&
+                databaseManager.isConnected() &&
+                playerDataManager != null;
     }
 }

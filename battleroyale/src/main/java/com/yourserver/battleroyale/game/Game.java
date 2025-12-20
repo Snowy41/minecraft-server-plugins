@@ -34,6 +34,11 @@ import java.util.stream.Collectors;
  * 6. After time/small zone: Deathmatch (DEATHMATCH)
  * 7. Winner determined, stats saved (ENDING)
  * 8. Game cleanup
+ *
+ * FIXED:
+ * - Added automatic cleanup after ENDING state
+ * - Games properly remove themselves after completion
+ * - Players are returned to spawn after game ends
  */
 public class Game {
 
@@ -136,6 +141,8 @@ public class Game {
                 if (scheduler != null) {
                     scheduler.stop();
                 }
+                // FIXED: Schedule automatic cleanup
+                scheduleCleanup();
             }
         }
     }
@@ -305,6 +312,42 @@ public class Game {
         // TODO: Save statistics to database
         // TODO: Reward players
         // TODO: Schedule cleanup and world deletion
+    }
+
+    /**
+     * FIXED: Schedules game cleanup after ENDING state.
+     * Waits 10 seconds to display winner/stats, then:
+     * - Kicks all players back to spawn
+     * - Clears all data structures
+     * - Prepares game for removal by GameManager
+     */
+    private void scheduleCleanup() {
+        Bukkit.getScheduler().runTaskLater(plugin, () -> {
+            plugin.getLogger().info("Cleaning up game " + id + "...");
+
+            // Kick all remaining players back to spawn
+            for (org.bukkit.entity.Player player : getOnlinePlayers()) {
+                player.sendMessage(Component.text("Game ended! Returning to spawn...", NamedTextColor.YELLOW));
+
+                // Teleport to world spawn (or lobby if you have one)
+                World world = player.getWorld();
+                if (world != null) {
+                    player.teleport(world.getSpawnLocation());
+                } else {
+                    // Fallback to main world spawn
+                    World mainWorld = Bukkit.getWorlds().get(0);
+                    player.teleport(mainWorld.getSpawnLocation());
+                }
+            }
+
+            // Clear all data structures
+            players.clear();
+            alivePlayers.clear();
+            spectators.clear();
+
+            plugin.getLogger().info("Game " + id + " cleanup complete - ready for removal");
+
+        }, 200L); // 10 seconds (200 ticks)
     }
 
     // ===== PLAYER MANAGEMENT =====

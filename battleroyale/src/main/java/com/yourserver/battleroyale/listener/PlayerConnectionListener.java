@@ -12,6 +12,9 @@ import org.bukkit.event.player.PlayerQuitEvent;
 
 /**
  * Handles player connection events.
+ *
+ * FIXED: Players are NO LONGER auto-joined to games on server join!
+ * They must use /br join to join a game manually.
  */
 public class PlayerConnectionListener implements Listener {
 
@@ -27,22 +30,10 @@ public class PlayerConnectionListener implements Listener {
     public void onPlayerJoin(PlayerJoinEvent event) {
         Player player = event.getPlayer();
 
-        // Find or create a joinable game
-        Game game = gameManager.findJoinableGame();
+        // REMOVED AUTO-JOIN LOGIC
+        // Players now spawn in lobby and must manually use /br join
 
-        if (game == null) {
-            // Create new game if none available
-            game = gameManager.createGame();
-            plugin.getLogger().info("Created new game for player " + player.getName());
-        }
-
-        // Add player to game
-        if (gameManager.joinGame(player, game)) {
-            plugin.getLogger().info("Player " + player.getName() + " joined game " + game.getId());
-        } else {
-            plugin.getLogger().warning("Failed to add player " + player.getName() + " to game!");
-            // TODO: Kick player or send to lobby
-        }
+        plugin.getLogger().info("Player " + player.getName() + " connected (not auto-joined to game)");
     }
 
     @EventHandler(priority = EventPriority.MONITOR)
@@ -52,7 +43,7 @@ public class PlayerConnectionListener implements Listener {
         // Remove from game if in one
         if (gameManager.isInGame(player)) {
             gameManager.leaveGame(player);
-            plugin.getLogger().info("Player " + player.getName() + " left game");
+            plugin.getLogger().info("Player " + player.getName() + " left game on disconnect");
         }
     }
 }

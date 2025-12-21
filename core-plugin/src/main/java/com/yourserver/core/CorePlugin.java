@@ -155,7 +155,7 @@ public class CorePlugin extends JavaPlugin {
             getLogger().info("╚════════════════════════════════════════╝");
 
             // Send startup message to Redis
-            if (redisManager != null && redisManager.isConnected()) {
+            if (redisManager != null && redisManager.isConnected() && serviceInfo != null) {
                 sendServiceStartupMessage();
             }
 
@@ -176,7 +176,7 @@ public class CorePlugin extends JavaPlugin {
         getLogger().info("╚════════════════════════════════════════╝");
 
         // Send shutdown message to Redis
-        if (redisManager != null && redisManager.isConnected()) {
+        if (redisManager != null && redisManager.isConnected() && serviceInfo != null) {
             sendServiceShutdownMessage();
         }
 
@@ -380,7 +380,7 @@ public class CorePlugin extends JavaPlugin {
     // ===== CLOUDNET MESSAGING =====
 
     private void sendServiceStartupMessage() {
-        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+        if (redisManager == null || serviceInfo == null || !serviceInfo.isCloudNetService()) {
             return;
         }
 
@@ -395,7 +395,7 @@ public class CorePlugin extends JavaPlugin {
     }
 
     private void sendServiceShutdownMessage() {
-        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+        if (redisManager == null || serviceInfo == null || !serviceInfo.isCloudNetService()) {
             return;
         }
 
@@ -410,7 +410,7 @@ public class CorePlugin extends JavaPlugin {
     }
 
     private void sendServiceHeartbeat() {
-        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+        if (redisManager == null || serviceInfo == null || !serviceInfo.isCloudNetService()) {
             return;
         }
 

@@ -3,7 +3,7 @@ mysql:
   port: 3306
   database: "minecraft_server"
   username: "minecraft"
-  password: "Tobi1748"  # The password you set!
+  password: "Tobi1748"
 
   pool:
     maximum-pool-size: 8
@@ -16,3 +16,4 @@ redis:
   host: "redis-13511.crce218.eu-central-1-1.ec2.cloud.redislabs.com"
   port: 13511
   password: "TUdVa4lhKdpQDIiI5ynKrb3ylzllqmmp"
+  key-prefix: "mcserver:"

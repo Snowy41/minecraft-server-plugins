@@ -75,9 +75,11 @@ public class CorePlugin extends JavaPlugin {
         getLogger().info("║  MySQL + Redis + CloudNet 4.0          ║");
         getLogger().info("╚════════════════════════════════════════╝");
 
-        // Save default configuration files
-        saveDefaultConfig();
-        saveResource("database.yml", false);
+        // Note: We don't use config.yml - only database.yml
+        // Create plugin data folder if it doesn't exist
+        if (!getDataFolder().exists()) {
+            getDataFolder().mkdirs();
+        }
 
         // Detect CloudNet 4.0 environment
         this.serviceInfo = CloudNetServiceInfo.detect(getLogger());

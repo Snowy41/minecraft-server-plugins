@@ -3,7 +3,7 @@ package com.yourserver.social.manager;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
-import com.yourserver.social.database.JSONClanRepository;
+import com.yourserver.social.database.MySQLClanRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Clan;
 import org.bukkit.Bukkit;
@@ -15,12 +15,13 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Manages clan system with caching and cross-server messaging.
+ * Manages clan system with MySQL storage and cross-server messaging.
+ * CloudNet 4.0.0 + MySQL Edition
  */
 public class ClanManager {
 
     private final SocialPlugin plugin;
-    private final JSONClanRepository repository;
+    private final MySQLClanRepository repository;
     private final SocialMessenger messenger;
 
     // Cache clans (10 minutes)
@@ -28,7 +29,7 @@ public class ClanManager {
     private final Cache<UUID, String> playerClanCache;
 
     public ClanManager(@NotNull SocialPlugin plugin,
-                       @NotNull JSONClanRepository repository,
+                       @NotNull MySQLClanRepository repository,
                        @NotNull SocialMessenger messenger) {
         this.plugin = plugin;
         this.repository = repository;
@@ -50,8 +51,12 @@ public class ClanManager {
 
         // Schedule expired invite cleanup (every 10 minutes)
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            repository.deleteExpiredInvites();
-        }, 12000L, 12000L);
+            repository.deleteExpiredInvites().thenAccept(count -> {
+                if (count > 0) {
+                    plugin.getLogger().info("Cleaned up " + count + " expired clan invites");
+                }
+            });
+        }, 12000L, 12000L); // 10 minutes
     }
 
     /**
@@ -81,11 +86,16 @@ public class ClanManager {
         UUID ownerUuid = owner.getUniqueId();
 
         // Validation
-        if (name.length() < 3 || name.length() > 16) {
+        int minName = plugin.getSocialConfig().getClansConfig().getMinNameLength();
+        int maxName = plugin.getSocialConfig().getClansConfig().getMaxNameLength();
+        int minTag = plugin.getSocialConfig().getClansConfig().getMinTagLength();
+        int maxTag = plugin.getSocialConfig().getClansConfig().getMaxTagLength();
+
+        if (name.length() < minName || name.length() > maxName) {
             return CompletableFuture.completedFuture(ClanResult.INVALID_NAME);
         }
 
-        if (tag.length() < 2 || tag.length() > 6) {
+        if (tag.length() < minTag || tag.length() > maxTag) {
             return CompletableFuture.completedFuture(ClanResult.INVALID_TAG);
         }
 
@@ -108,7 +118,7 @@ public class ClanManager {
                     }
 
                     // Create clan
-                    int maxMembers = 50; // TODO: Get from config
+                    int maxMembers = plugin.getSocialConfig().getClansConfig().getMaxMembers();
                     Clan clan = Clan.create(name, tag, ownerUuid, maxMembers);
 
                     return repository.createClan(clan).thenApply(v -> {
@@ -116,6 +126,7 @@ public class ClanManager {
                         clanCache.put(clan.getId(), clan);
                         playerClanCache.put(ownerUuid, clan.getId());
 
+                        plugin.getLogger().info("Clan created: " + name + " [" + tag + "] by " + owner.getName());
                         return ClanResult.SUCCESS;
                     });
                 });
@@ -149,8 +160,9 @@ public class ClanManager {
                 }
 
                 // Notify all members
-                notifyClanMembers(clan, "disbanded");
+                notifyClanMembers(clan, "§cClan disbanded!");
 
+                plugin.getLogger().info("Clan disbanded: " + clan.getName() + " by " + disbander.getName());
                 return ClanResult.SUCCESS;
             });
         });
@@ -193,6 +205,8 @@ public class ClanManager {
                         .thenApply(v -> {
                             // Send cross-server message
                             messenger.sendClanInvite(clan.getId(), inviterUuid, targetUuid);
+
+                            plugin.getLogger().fine("Clan invite sent: " + inviter.getName() + " invited " + targetName + " to " + clan.getName());
                             return ClanResult.SUCCESS;
                         });
             });
@@ -229,6 +243,7 @@ public class ClanManager {
                         // Send cross-server message
                         messenger.joinClan(clanId, accepterUuid, accepter.getName());
 
+                        plugin.getLogger().info("Player joined clan: " + accepter.getName() + " joined " + clan.getName());
                         return ClanResult.SUCCESS;
                     });
         });
@@ -268,6 +283,7 @@ public class ClanManager {
                 clanCache.put(clan.getId(), clan);
                 playerClanCache.invalidate(leaverUuid);
 
+                plugin.getLogger().info("Player left clan: " + leaver.getName() + " left " + clan.getName());
                 return ClanResult.SUCCESS;
             });
         });
@@ -311,6 +327,7 @@ public class ClanManager {
                     kicked.sendMessage("§cYou were kicked from the clan!");
                 }
 
+                plugin.getLogger().info("Player kicked from clan: " + targetUuid + " kicked from " + clan.getName());
                 return ClanResult.SUCCESS;
             });
         });
@@ -346,6 +363,7 @@ public class ClanManager {
                 clan.setRank(targetUuid, newRank);
                 clanCache.put(clan.getId(), clan);
 
+                plugin.getLogger().info("Member promoted: " + targetUuid + " to " + newRank + " in " + clan.getName());
                 return ClanResult.SUCCESS;
             });
         });
@@ -414,73 +432,8 @@ public class ClanManager {
     }
 
     /**
-     * Gets pending clan invites.
+     * Gets a clan by name (cached).
      */
-    @NotNull
-    public CompletableFuture<List<JSONClanRepository.ClanInvite>> getPendingInvites(@NotNull UUID playerUuid) {
-        return repository.getPendingInvites(playerUuid);
-    }
-
-    // ===== MESSAGE HANDLERS =====
-
-    private void handleInviteMessage(@NotNull SocialMessenger.SocialMessage msg) {
-        Player target = Bukkit.getPlayer(msg.to);
-        if (target == null) return;
-
-        String clanName = msg.data.get("clanName");
-
-        target.sendMessage(plugin.getMiniMessage().deserialize(
-                plugin.getSocialConfig().getMessagesConfig().getPrefix() +
-                        "<yellow>You've been invited to clan <white>" + clanName +
-                        "<yellow>! <click:run_command:/clan accept " + clanName + ">[Accept]</click>"
-        ));
-    }
-
-    private void handleJoinMessage(@NotNull SocialMessenger.SocialMessage msg) {
-        String clanId = msg.data.get("clanId");
-        String playerName = msg.data.get("playerName");
-
-        getClan(clanId).thenAccept(clanOpt -> {
-            if (clanOpt.isEmpty()) return;
-
-            Clan clan = clanOpt.get();
-            notifyClanMembers(clan, playerName + " joined the clan!");
-        });
-    }
-
-    private void handleLeaveMessage(@NotNull SocialMessenger.SocialMessage msg) {
-        String clanId = msg.data.get("clanId");
-        String playerName = msg.data.get("playerName");
-
-        getClan(clanId).thenAccept(clanOpt -> {
-            if (clanOpt.isEmpty()) return;
-
-            Clan clan = clanOpt.get();
-            notifyClanMembers(clan, playerName + " left the clan");
-        });
-    }
-
-    private void handleChatMessage(@NotNull SocialMessenger.SocialMessage msg) {
-        String clanId = msg.data.get("clanId");
-        String senderName = msg.data.get("senderName");
-        String message = msg.data.get("message");
-
-        getClan(clanId).thenAccept(clanOpt -> {
-            if (clanOpt.isEmpty()) return;
-
-            Clan clan = clanOpt.get();
-
-            for (UUID member : clan.getMembers().keySet()) {
-                Player p = Bukkit.getPlayer(member);
-                if (p != null) {
-                    p.sendMessage("§8[§2CLAN§8] §f" + senderName + "§8: §f" + message);
-                }
-            }
-        });
-    }
-
-    // ===== UTILITY =====
-
     @NotNull
     public CompletableFuture<java.util.Optional<Clan>> getClanByName(@NotNull String name) {
         // Check cache first
@@ -522,12 +475,79 @@ public class ClanManager {
         });
     }
 
+    /**
+     * Gets pending clan invites.
+     */
+    @NotNull
+    public CompletableFuture<List<MySQLClanRepository.ClanInvite>> getPendingInvites(@NotNull UUID playerUuid) {
+        return repository.getPendingInvites(playerUuid);
+    }
+
+    // ===== MESSAGE HANDLERS =====
+
+    private void handleInviteMessage(@NotNull SocialMessenger.SocialMessage msg) {
+        Player target = Bukkit.getPlayer(msg.to);
+        if (target == null) return;
+
+        String clanName = msg.data.get("clanName");
+
+        target.sendMessage(plugin.getMiniMessage().deserialize(
+                plugin.getSocialConfig().getMessagesConfig().getPrefix() +
+                        "<yellow>You've been invited to clan <white>" + clanName +
+                        "<yellow>! <click:run_command:/clan accept " + clanName + ">[Accept]</click>"
+        ));
+    }
+
+    private void handleJoinMessage(@NotNull SocialMessenger.SocialMessage msg) {
+        String clanId = msg.data.get("clanId");
+        String playerName = msg.data.get("playerName");
+
+        getClan(clanId).thenAccept(clanOpt -> {
+            if (clanOpt.isEmpty()) return;
+
+            Clan clan = clanOpt.get();
+            notifyClanMembers(clan, "§a" + playerName + " joined the clan!");
+        });
+    }
+
+    private void handleLeaveMessage(@NotNull SocialMessenger.SocialMessage msg) {
+        String clanId = msg.data.get("clanId");
+        String playerName = msg.data.get("playerName");
+
+        getClan(clanId).thenAccept(clanOpt -> {
+            if (clanOpt.isEmpty()) return;
+
+            Clan clan = clanOpt.get();
+            notifyClanMembers(clan, "§e" + playerName + " left the clan");
+        });
+    }
+
+    private void handleChatMessage(@NotNull SocialMessenger.SocialMessage msg) {
+        String clanId = msg.data.get("clanId");
+        String senderName = msg.data.get("senderName");
+        String message = msg.data.get("message");
+
+        getClan(clanId).thenAccept(clanOpt -> {
+            if (clanOpt.isEmpty()) return;
+
+            Clan clan = clanOpt.get();
+
+            for (UUID member : clan.getMembers().keySet()) {
+                Player p = Bukkit.getPlayer(member);
+                if (p != null) {
+                    p.sendMessage("§8[§2CLAN§8] §f" + senderName + "§8: §f" + message);
+                }
+            }
+        });
+    }
+
+    // ===== UTILITY =====
 
     private void notifyClanMembers(@NotNull Clan clan, @NotNull String message) {
         for (UUID member : clan.getMembers().keySet()) {
             Player p = Bukkit.getPlayer(member);
             if (p != null) {
-                p.sendMessage("§8[§2CLAN§8] §f" + message);
+                p.sendMessage(message);
             }
         }
     }
@@ -537,6 +557,7 @@ public class ClanManager {
     public void shutdown() {
         clanCache.invalidateAll();
         playerClanCache.invalidateAll();
+        plugin.getLogger().info("ClanManager shut down - caches cleared");
     }
 
     // ===== RESULT ENUM =====

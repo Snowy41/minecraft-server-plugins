@@ -20,17 +20,19 @@ import java.util.logging.Level;
 
 /**
  * Social Plugin - Friends, Parties, and Clans
+ * CloudNet 4.0.0 + MySQL Edition
  *
  * Features:
- * - Friend system (add/remove/list)
- * - Party system (invite/join/leave/warp)
- * - Clan system (create/invite/join/chat)
+ * - Friend system (MySQL storage)
+ * - Party system (Redis temporary storage)
+ * - Clan system (MySQL storage)
  * - Cross-server support via Redis Pub/Sub
  *
  * Dependencies:
- * - CorePlugin (for database/Redis access)
- * - MySQL (persistent storage for friends/clans)
- * - Redis (real-time messaging + party state)
+ * - CorePlugin (for MySQL database + Redis access)
+ *
+ * @author MCBZH
+ * @version 2.0.0 - CloudNet 4.0.0 Edition
  */
 public class SocialPlugin extends JavaPlugin {
 
@@ -50,54 +52,67 @@ public class SocialPlugin extends JavaPlugin {
 
     @Override
     public void onLoad() {
-        getLogger().info("Loading SocialPlugin...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  SocialPlugin v" + getDescription().getVersion() + "                ║");
+        getLogger().info("║  CloudNet 4.0.0 + MySQL Edition        ║");
+        getLogger().info("╚════════════════════════════════════════╝");
+
         saveDefaultConfig();
     }
 
     @Override
     public void onEnable() {
-        getLogger().info("Enabling SocialPlugin...");
+        long startTime = System.currentTimeMillis();
 
         try {
-            // 1. Get CorePlugin (provides Redis only, NOT database)
+            // === PHASE 1: CORE PLUGIN ===
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");
             if (corePlugin == null) {
                 throw new IllegalStateException("CorePlugin not found! SocialPlugin requires CorePlugin.");
             }
             getLogger().info("✓ CorePlugin found");
 
-            // 2. Initialize MiniMessage
+            // === PHASE 2: CONFIGURATION ===
             miniMessage = MiniMessage.miniMessage();
-
-            // 3. Load configuration
             config = SocialConfig.load(getDataFolder());
             getLogger().info("✓ Configuration loaded");
 
-            // 4. Initialize JSON repositories (NOT MySQL!)
-            getLogger().info("Using JSON storage (storage type: " + config.getStorageType() + ")");
+            // === PHASE 3: DATABASE ===
+            getLogger().info("Initializing MySQL repositories...");
 
-            JSONFriendRepository friendRepo = new JSONFriendRepository(getDataFolder(), getLogger());
-            JSONClanRepository clanRepo = new JSONClanRepository(getDataFolder(), getLogger());
+            MySQLFriendRepository friendRepo = new MySQLFriendRepository(
+                    corePlugin.getDatabaseManager().getDataSource(),
+                    corePlugin.getAsyncExecutor(),
+                    getLogger()
+            );
+
+            MySQLClanRepository clanRepo = new MySQLClanRepository(
+                    corePlugin.getDatabaseManager().getDataSource(),
+                    corePlugin.getAsyncExecutor(),
+                    getLogger()
+            );
+
             RedisPartyRepository partyRepo = new RedisPartyRepository(
                     corePlugin.getRedisManager()
             );
-            getLogger().info("✓ JSON repositories initialized");
 
-            // 5. Initialize cross-server messenger
+            getLogger().info("✓ MySQL repositories initialized");
+
+            // === PHASE 4: MESSAGING ===
             messenger = new SocialMessenger(
                     this,
                     corePlugin.getRedisMessenger()
             );
             getLogger().info("✓ Redis messaging initialized");
 
-            // 6. Initialize managers
+            // === PHASE 5: MANAGERS ===
             friendManager = new FriendManager(this, friendRepo, messenger);
             partyManager = new PartyManager(this, partyRepo, messenger);
             clanManager = new ClanManager(this, clanRepo, messenger);
             guiManager = new GUIManager(this, friendManager, partyManager, clanManager);
             getLogger().info("✓ Managers initialized");
 
-            // 7. Register listeners
+            // === PHASE 6: LISTENERS ===
             getServer().getPluginManager().registerEvents(
                     new PlayerConnectionListener(this, friendManager, partyManager),
                     this
@@ -109,7 +124,7 @@ public class SocialPlugin extends JavaPlugin {
             getServer().getPluginManager().registerEvents(guiManager, this);
             getLogger().info("✓ Event listeners registered");
 
-            // 8. Register commands
+            // === PHASE 7: COMMANDS ===
             FriendCommand friendCmd = new FriendCommand(this, friendManager, guiManager);
             getCommand("friend").setExecutor(friendCmd);
             getCommand("friend").setTabCompleter(friendCmd);
@@ -123,18 +138,31 @@ public class SocialPlugin extends JavaPlugin {
             getCommand("clan").setTabCompleter(clanCmd);
             getLogger().info("✓ Commands registered");
 
-            getLogger().info("SocialPlugin enabled successfully!");
-            getLogger().info("✓ Friends, Parties, and Clans ready!");
+            // === SUCCESS ===
+            long elapsed = System.currentTimeMillis() - startTime;
+            getLogger().info("╔════════════════════════════════════════╗");
+            getLogger().info("║  ✓ SOCIALPLUGIN ENABLED SUCCESSFULLY   ║");
+            getLogger().info("╠════════════════════════════════════════╣");
+            getLogger().info("║  Storage: MySQL + Redis                ║");
+            getLogger().info("║  CloudNet: 4.0.0                       ║");
+            getLogger().info("║  Features: Friends, Parties, Clans     ║");
+            getLogger().info("║  Startup: " + elapsed + "ms" + " ".repeat(25 - String.valueOf(elapsed).length()) + "║");
+            getLogger().info("╚════════════════════════════════════════╝");
 
         } catch (Exception e) {
-            getLogger().log(Level.SEVERE, "Failed to enable SocialPlugin!", e);
+            getLogger().log(Level.SEVERE, "╔════════════════════════════════════════╗", e);
+            getLogger().severe("║  ✗ STARTUP FAILED!                     ║");
+            getLogger().severe("║  Check logs for details                ║");
+            getLogger().severe("╚════════════════════════════════════════╝");
             getServer().getPluginManager().disablePlugin(this);
         }
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("Disabling SocialPlugin...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  Shutting down SocialPlugin...         ║");
+        getLogger().info("╚════════════════════════════════════════╝");
 
         // 1. Shutdown managers
         if (partyManager != null) {
@@ -158,7 +186,9 @@ public class SocialPlugin extends JavaPlugin {
             getLogger().info("✓ Messenger shut down");
         }
 
-        getLogger().info("SocialPlugin disabled successfully!");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  ✓ SocialPlugin disabled successfully  ║");
+        getLogger().info("╚════════════════════════════════════════╝");
     }
 
     /**
@@ -170,7 +200,7 @@ public class SocialPlugin extends JavaPlugin {
         getLogger().info("Configuration reloaded");
     }
 
-    // ===== Public API =====
+    // ===== PUBLIC API =====
 
     public CorePlugin getCorePlugin() {
         return corePlugin;

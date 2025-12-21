@@ -3,8 +3,7 @@ package com.yourserver.social.manager;
 import com.github.benmanes.caffeine.cache.Cache;
 import com.github.benmanes.caffeine.cache.Caffeine;
 import com.yourserver.social.SocialPlugin;
-import com.yourserver.social.database.JSONClanRepository;
-import com.yourserver.social.database.JSONFriendRepository;
+import com.yourserver.social.database.MySQLFriendRepository;
 import com.yourserver.social.messaging.SocialMessenger;
 import com.yourserver.social.model.Friend;
 import com.yourserver.social.model.FriendRequest;
@@ -18,19 +17,20 @@ import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
 
 /**
- * Manages friend system with caching and cross-server messaging.
+ * Manages friend system with MySQL storage and cross-server messaging.
+ * CloudNet 4.0.0 + MySQL Edition
  */
 public class FriendManager {
 
     private final SocialPlugin plugin;
-    private final JSONFriendRepository repository;
+    private final MySQLFriendRepository repository;
     private final SocialMessenger messenger;
 
     // Cache friends list (10 minutes)
     private final Cache<UUID, List<Friend>> friendsCache;
 
     public FriendManager(@NotNull SocialPlugin plugin,
-                         @NotNull JSONFriendRepository repository,
+                         @NotNull MySQLFriendRepository repository,
                          @NotNull SocialMessenger messenger) {
         this.plugin = plugin;
         this.repository = repository;
@@ -47,8 +47,12 @@ public class FriendManager {
 
         // Schedule expired request cleanup (every 5 minutes)
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            repository.deleteExpiredRequests();
-        }, 6000L, 6000L);
+            repository.deleteExpiredRequests().thenAccept(count -> {
+                if (count > 0) {
+                    plugin.getLogger().info("Cleaned up " + count + " expired friend requests");
+                }
+            });
+        }, 6000L, 6000L); // 5 minutes
     }
 
     /**
@@ -114,6 +118,8 @@ public class FriendManager {
                     return repository.createRequest(request).thenApply(v -> {
                         // Send cross-server message
                         messenger.sendFriendRequest(senderUuid, targetUuid);
+
+                        plugin.getLogger().fine("Friend request sent: " + sender.getName() + " -> " + targetName);
                         return RequestResult.SUCCESS;
                     });
                 });
@@ -151,6 +157,8 @@ public class FriendManager {
 
                     // Send cross-server message
                     messenger.acceptFriendRequest(accepterUuid, fromUuid);
+
+                    plugin.getLogger().info("Friend request accepted: " + accepter.getName() + " accepted from " + request.getFromName());
                     return RequestResult.SUCCESS;
                 });
             });
@@ -162,7 +170,9 @@ public class FriendManager {
      */
     @NotNull
     public CompletableFuture<Void> denyFriendRequest(@NotNull UUID denier, @NotNull UUID from) {
-        return repository.deleteRequest(from, denier);
+        return repository.deleteRequest(from, denier).thenRun(() -> {
+            plugin.getLogger().fine("Friend request denied: " + denier + " denied " + from);
+        });
     }
 
     /**
@@ -184,6 +194,8 @@ public class FriendManager {
 
                 // Send cross-server message
                 messenger.removeFriend(playerUuid, friendUuid);
+
+                plugin.getLogger().info("Friend removed: " + player.getName() + " removed " + friendUuid);
                 return true;
             });
         });
@@ -240,6 +252,8 @@ public class FriendManager {
         target.sendMessage(plugin.getMiniMessage().deserialize(
                 plugin.getSocialConfig().getMessagesConfig().getPrefix() + message
         ));
+
+        plugin.getLogger().fine("Friend request notification sent to " + target.getName());
     }
 
     private void handleFriendAcceptMessage(@NotNull SocialMessenger.SocialMessage msg) {
@@ -248,6 +262,9 @@ public class FriendManager {
 
         Player accepter = Bukkit.getPlayer(msg.to);
         String accepterName = accepter != null ? accepter.getName() : "Unknown";
+
+        // Invalidate cache
+        friendsCache.invalidate(sender.getUniqueId());
 
         // Show notification
         String message = plugin.getSocialConfig().getMessagesConfig()
@@ -264,14 +281,19 @@ public class FriendManager {
         Player p1 = Bukkit.getPlayer(msg.from);
         Player p2 = Bukkit.getPlayer(msg.to);
 
-        if (p1 != null) friendsCache.invalidate(p1.getUniqueId());
-        if (p2 != null) friendsCache.invalidate(p2.getUniqueId());
+        if (p1 != null) {
+            friendsCache.invalidate(p1.getUniqueId());
+        }
+        if (p2 != null) {
+            friendsCache.invalidate(p2.getUniqueId());
+        }
     }
 
     // ===== LIFECYCLE =====
 
     public void shutdown() {
         friendsCache.invalidateAll();
+        plugin.getLogger().info("FriendManager shut down - cache cleared");
     }
 
     // ===== RESULT ENUM =====

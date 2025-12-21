@@ -1,5 +1,5 @@
 # Lobby Plugin Configuration
-# Version: 1.0.0
+# Version: 2.0.0 - CloudNet 4.0 Compatible
 
 # Spawn location (set via /lobby setspawn or configure here)
 spawn:
@@ -46,7 +46,7 @@ protection:
         y: -30
         z: 130
 
-# Scoreboard configuration
+# Scoreboard configuration - CloudNet aware
 scoreboard:
   enabled: true
   update-interval: 10
@@ -56,6 +56,9 @@ scoreboard:
     - "<gray>Player: <white>{player}"
     - "{rank}"
     - ""
+    - "<yellow>Service: <white>{service}"
+    - "<gray>Group: <white>{service_group}"
+    - ""
     - "<yellow>Partition: {partition}"
     - "<gray>Online: <green>{online}"
     - "<gray>Max: <green>{max_players}"
@@ -63,7 +66,7 @@ scoreboard:
     - "<yellow>play.yourserver.com"
     - ""
 
-# Tab list configuration
+# Tab list configuration - CloudNet aware
 tablist:
   enabled: true
   update-interval: 20
@@ -71,10 +74,12 @@ tablist:
     - ""
     - "<gradient:#FFD700:#FFA500><bold>YOUR SERVER</bold></gradient>"
     - "<gray>Welcome, <white>{player}"
+    - "<gray>Service: <yellow>{service}"
     - ""
   footer:
     - ""
     - "<gray>Online: <green>{online}<gray>/<green>{max_players}"
+    - "<gray>Partition: <yellow>{partition}"
     - "<yellow>play.yourserver.com"
     - ""
 
@@ -83,7 +88,7 @@ gui:
   enabled: true
   give-compass: true
 
-# Items given on join - FIXED INDENTATION!
+# Items given on join
 join-items:
   enabled: true
   clear-inventory: true

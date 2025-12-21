@@ -6,10 +6,14 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import com.yourserver.lobby.util.PartitionHelper;
 
 /**
- * Manages player tab list headers and footers.
+ * Manages player tab list with CloudNet 4.0 awareness.
+ *
+ * CLOUDNET INTEGRATION:
+ * - Shows CloudNet service information
+ * - Displays accurate player counts
+ * - Updates rank icons in tab names
  */
 public class TabListManager {
 
@@ -26,8 +30,6 @@ public class TabListManager {
 
     /**
      * Updates a player's tab list.
-     *
-     * @param player The player
      */
     public void updatePlayer(Player player) {
         Component header = parseLines(config.getTabListConfig().getHeader(), player);
@@ -35,20 +37,15 @@ public class TabListManager {
 
         player.sendPlayerListHeaderAndFooter(header, footer);
 
-        // ALSO UPDATE TAB NAME WITH RANK ICON
+        // Update tab name with rank icon
         updatePlayerTabName(player);
     }
 
     /**
      * Updates a player's tab list name with rank icon.
-     *
-     * @param player The player
      */
     public void updatePlayerTabName(Player player) {
-        // Get rank display manager from CorePlugin
-        var corePlugin = (com.yourserver.core.CorePlugin)
-                plugin.getServer().getPluginManager().getPlugin("CorePlugin");
-
+        var corePlugin = plugin.getCorePlugin();
         if (corePlugin == null) return;
 
         var rankManager = corePlugin.getRankDisplayManager();
@@ -73,10 +70,6 @@ public class TabListManager {
 
     /**
      * Parses a list of lines into a Component.
-     *
-     * @param lines The lines
-     * @param player The player
-     * @return The combined component
      */
     private Component parseLines(java.util.List<String> lines, Player player) {
         if (lines.isEmpty()) {
@@ -96,18 +89,32 @@ public class TabListManager {
     }
 
     /**
-     * Parses placeholders in a string.
-     *
-     * @param text The text with placeholders
-     * @param player The player
-     * @return The text with placeholders replaced
+     * Parses placeholders with CloudNet awareness.
      */
     private String parsePlaceholders(String text, Player player) {
-        // NEW WAY (partition-aware):
-        text = PartitionHelper.replacePlaceholders(text, player);
+        // Get CloudNet service info
+        var corePlugin = plugin.getCorePlugin();
+        var serviceInfo = corePlugin.getServiceInfo();
 
-        return text
-                .replace("{player}", player.getName());
+        String serviceName = serviceInfo != null && serviceInfo.isCloudNetService()
+                ? serviceInfo.getName()
+                : "Standalone";
+
+        String serviceGroup = serviceInfo != null && serviceInfo.isCloudNetService()
+                ? serviceInfo.getGroup()
+                : "N/A";
+
+        // Use partition helper for accurate counts
+        text = com.yourserver.lobby.util.PartitionHelper.replacePlaceholders(text, player);
+
+        // Replace CloudNet-specific placeholders
+        text = text
+                .replace("{player}", player.getName())
+                .replace("{service}", serviceName)
+                .replace("{service_group}", serviceGroup)
+                .replace("{server}", serviceName); // Alias
+
+        return text;
     }
 
     /**

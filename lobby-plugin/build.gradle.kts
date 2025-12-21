@@ -17,8 +17,8 @@ dependencies {
     // API Module
     compileOnly(project(":api-module"))
 
-    // Paper API 1.21.4 (update to 1.21.8 when available)
-    compileOnly("io.papermc.paper:paper-api:1.21.8-R0.1-SNAPSHOT")
+    // Paper API 1.21.4
+    compileOnly("io.papermc.paper:paper-api:1.21.4-R0.1-SNAPSHOT")
 
     // Adventure API - USE compileOnly, NOT implementation!
     // Paper already includes Adventure API, so we don't need to shade it
@@ -42,7 +42,7 @@ tasks {
     test {
         useJUnitPlatform()
 
-        // Exclude ItemBuilderTest until MockBukkit fully supports 1.21.8
+        // Exclude ItemBuilderTest until MockBukkit fully supports 1.21.4
         exclude("**/ItemBuilderTest.class")
 
         testLogging {

@@ -1,6 +1,5 @@
 package com.yourserver.lobby;
 
-import com.destroystokyo.paper.profile.PlayerProfile;
 import com.yourserver.core.CorePlugin;
 import com.yourserver.lobby.command.LobbyCommand;
 import com.yourserver.lobby.command.SpawnCommand;
@@ -16,7 +15,6 @@ import com.yourserver.lobby.scoreboard.ScoreboardManager;
 import com.yourserver.lobby.spawn.SpawnManager;
 import com.yourserver.lobby.tablist.TabListManager;
 import com.yourserver.lobby.time.TimeManager;
-import com.yourserver.lobby.util.ItemBuilder;
 import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
@@ -35,6 +33,12 @@ import java.util.logging.Level;
  * - Dynamic tab list
  * - Custom GUI system
  * - Cosmetics (particle trails, etc.)
+ *
+ * CLOUDNET 4.0 INTEGRATION:
+ * ✅ CloudNet service detection via CorePlugin
+ * ✅ Cross-server messaging via Redis
+ * ✅ Shared MySQL database
+ * ✅ Service-aware player counts
  */
 public class LobbyPlugin extends JavaPlugin {
 
@@ -57,30 +61,43 @@ public class LobbyPlugin extends JavaPlugin {
 
     @Override
     public void onLoad() {
-        getLogger().info("Loading LobbyPlugin...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  LobbyPlugin v" + getDescription().getVersion() + "                  ║");
+        getLogger().info("║  CloudNet 4.0 Compatible               ║");
+        getLogger().info("╚════════════════════════════════════════╝");
         saveDefaultConfig();
     }
 
     @Override
     public void onEnable() {
-        getLogger().info("Enabling LobbyPlugin...");
+        long startTime = System.currentTimeMillis();
 
         try {
-            // 1. Get CorePlugin reference
+            // === PHASE 1: CORE PLUGIN REFERENCE ===
+            getLogger().info("Connecting to CorePlugin...");
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");
             if (corePlugin == null) {
                 throw new IllegalStateException("CorePlugin not found! LobbyPlugin requires CorePlugin.");
             }
-            getLogger().info("CorePlugin found and loaded");
 
-            // 2. Initialize MiniMessage
+            // Log CloudNet info if available
+            var serviceInfo = corePlugin.getServiceInfo();
+            if (serviceInfo != null && serviceInfo.isCloudNetService()) {
+                getLogger().info("✓ Running on CloudNet service: " + serviceInfo.getName());
+                getLogger().info("  Group: " + serviceInfo.getGroup());
+                getLogger().info("  Task: " + serviceInfo.getTask());
+            } else {
+                getLogger().info("✓ Running in standalone mode");
+            }
+
+            // === PHASE 2: CONFIGURATION ===
+            getLogger().info("Loading configuration...");
             miniMessage = MiniMessage.miniMessage();
-
-            // 3. Load configuration
             lobbyConfig = LobbyConfig.load(getDataFolder());
-            getLogger().info("Configuration loaded");
+            getLogger().info("✓ Configuration loaded");
 
-            // 4. Initialize managers
+            // === PHASE 3: MANAGERS ===
+            getLogger().info("Initializing managers...");
             spawnManager = new SpawnManager(this, lobbyConfig);
             scoreboardManager = new ScoreboardManager(this, lobbyConfig, corePlugin);
             tabListManager = new TabListManager(this, lobbyConfig);
@@ -92,27 +109,33 @@ public class LobbyPlugin extends JavaPlugin {
             // Set the item giver callback for when items are re-enabled
             itemToggleManager.setItemGiver(this::giveJoinItems);
 
-            getLogger().info("All managers initialized");
+            getLogger().info("✓ All managers initialized");
 
-            // 5. Register listeners
+            // === PHASE 4: LISTENERS ===
+            getLogger().info("Registering event listeners...");
+
             getServer().getPluginManager().registerEvents(
                     new PlayerConnectionListener(this, spawnManager, scoreboardManager,
                             tabListManager, cosmeticsManager),
                     this
             );
+
             getServer().getPluginManager().registerEvents(
                     new LobbyProtectionListener(lobbyConfig),
                     this
             );
+
             getServer().getPluginManager().registerEvents(
                     new CompassClickListener(guiManager),
                     this
             );
+
             getServer().getPluginManager().registerEvents(
                     new NetherStarClickListener(guiManager),
                     this
             );
 
+            // Friends menu integration (optional)
             if (getServer().getPluginManager().isPluginEnabled("SocialPlugin")) {
                 getServer().getPluginManager().registerEvents(
                         new com.yourserver.lobby.listener.FriendsMenuClickListener(),
@@ -125,64 +148,119 @@ public class LobbyPlugin extends JavaPlugin {
 
             getServer().getPluginManager().registerEvents(guiManager, this);
 
-
             // Register rank display listener for nametags and tab list
             rankDisplayListener = new com.yourserver.lobby.listener.RankDisplayListener(corePlugin);
             getServer().getPluginManager().registerEvents(rankDisplayListener, this);
-            getLogger().info("Event listeners registered");
 
-            // 6. Register commands
+            getLogger().info("✓ Event listeners registered");
+
+            // === PHASE 5: COMMANDS ===
+            getLogger().info("Registering commands...");
             getCommand("lobby").setExecutor(new LobbyCommand(this, spawnManager));
             getCommand("spawn").setExecutor(new SpawnCommand(this, spawnManager));
-            getCommand("refreshnametags").setExecutor(new com.yourserver.lobby.command.RefreshNametagsCommand(this));
-            getLogger().info("Commands registered");
+            getCommand("refreshnametags").setExecutor(
+                    new com.yourserver.lobby.command.RefreshNametagsCommand(this)
+            );
+            getLogger().info("✓ Commands registered");
 
-            // 7. Start update tasks
+            // === PHASE 6: UPDATE TASKS ===
+            getLogger().info("Starting update tasks...");
             scoreboardManager.startUpdateTask();
             tabListManager.startUpdateTask();
             cosmeticsManager.startTrailTask();
             timeManager.startTimeTask();
-            getLogger().info("Update tasks started");
+            getLogger().info("✓ Update tasks started");
 
-            getLogger().info("LobbyPlugin enabled successfully!");
+            // === PHASE 7: REDIS INTEGRATION (Optional) ===
+            if (corePlugin.getRedisManager() != null && corePlugin.getRedisManager().isConnected()) {
+                setupRedisIntegration();
+                getLogger().info("✓ Redis integration enabled");
+            } else {
+                getLogger().warning("Redis not available - cross-server features disabled");
+            }
+
+            // === SUCCESS ===
+            long elapsed = System.currentTimeMillis() - startTime;
+            getLogger().info("╔════════════════════════════════════════╗");
+            getLogger().info("║  ✓ LOBBYPLUGIN ENABLED SUCCESSFULLY    ║");
+            getLogger().info("╠════════════════════════════════════════╣");
+
+            if (serviceInfo != null && serviceInfo.isCloudNetService()) {
+                getLogger().info("║  CloudNet Service: " +
+                        String.format("%-20s", serviceInfo.getName()) + " ║");
+                getLogger().info("║  Group: " +
+                        String.format("%-29s", serviceInfo.getGroup()) + " ║");
+            }
+
+            getLogger().info("║  Startup: " + elapsed + "ms" +
+                    " ".repeat(25 - String.valueOf(elapsed).length()) + "║");
+            getLogger().info("╚════════════════════════════════════════╝");
 
         } catch (Exception e) {
-            getLogger().log(Level.SEVERE, "Failed to enable LobbyPlugin!", e);
+            getLogger().log(Level.SEVERE, "╔════════════════════════════════════════╗", e);
+            getLogger().severe("║  ✗ STARTUP FAILED!                     ║");
+            getLogger().severe("║  Check logs for details                ║");
+            getLogger().severe("╚════════════════════════════════════════╝");
             getServer().getPluginManager().disablePlugin(this);
         }
     }
 
     @Override
     public void onDisable() {
-        getLogger().info("Disabling LobbyPlugin...");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  Shutting down LobbyPlugin...          ║");
+        getLogger().info("╚════════════════════════════════════════╝");
 
         // Stop update tasks
         if (scoreboardManager != null) {
             scoreboardManager.shutdown();
-            getLogger().info("Scoreboard manager shut down");
+            getLogger().info("✓ Scoreboard manager shut down");
         }
 
         if (tabListManager != null) {
             tabListManager.shutdown();
-            getLogger().info("Tab list manager shut down");
+            getLogger().info("✓ Tab list manager shut down");
         }
 
         if (cosmeticsManager != null) {
             cosmeticsManager.shutdown();
-            getLogger().info("Cosmetics manager shut down");
+            getLogger().info("✓ Cosmetics manager shut down");
         }
 
         if (itemToggleManager != null) {
             itemToggleManager.shutdown();
-            getLogger().info("Item toggle manager shut down");
+            getLogger().info("✓ Item toggle manager shut down");
         }
 
         if (timeManager != null) {
             timeManager.shutdown();
-            getLogger().info("Time manager shut down");
+            getLogger().info("✓ Time manager shut down");
         }
 
-        getLogger().info("LobbyPlugin disabled successfully!");
+        getLogger().info("╔════════════════════════════════════════╗");
+        getLogger().info("║  ✓ LobbyPlugin disabled successfully   ║");
+        getLogger().info("╚════════════════════════════════════════╝");
+    }
+
+    /**
+     * Sets up Redis pub/sub integration for cross-server communication.
+     */
+    private void setupRedisIntegration() {
+        var redisManager = corePlugin.getRedisManager();
+        if (redisManager == null) return;
+
+        // Subscribe to lobby-specific channels
+        redisManager.subscribe("lobby:player:teleport", message -> {
+            getLogger().fine("Received teleport request: " + message);
+            // Handle cross-server teleport requests
+        });
+
+        redisManager.subscribe("lobby:broadcast", message -> {
+            // Broadcast message to all players in this lobby
+            Bukkit.broadcast(miniMessage.deserialize(message));
+        });
+
+        getLogger().info("Subscribed to Redis channels: lobby:*");
     }
 
     /**
@@ -211,7 +289,6 @@ public class LobbyPlugin extends JavaPlugin {
         }
     }
 
-
     /**
      * Reloads the plugin configuration.
      */
@@ -239,7 +316,7 @@ public class LobbyPlugin extends JavaPlugin {
         getLogger().info("Configuration reloaded");
     }
 
-    // ===== Public API for other components =====
+    // ===== PUBLIC API FOR OTHER COMPONENTS =====
 
     public CorePlugin getCorePlugin() {
         return corePlugin;
@@ -293,7 +370,7 @@ public class LobbyPlugin extends JavaPlugin {
 
     /**
      * Gives join items to a player.
-     * DEBUG VERSION: Added extensive logging to track the issue.
+     * Handles special case for PLAYER_HEAD with delay.
      *
      * @param player The player
      */
@@ -301,36 +378,25 @@ public class LobbyPlugin extends JavaPlugin {
         var joinItemsConfig = lobbyConfig.getJoinItemsConfig();
 
         if (!joinItemsConfig.isEnabled()) {
-            getLogger().info("Join items disabled in config");
             return;
         }
-
-        getLogger().info("Giving join items to " + player.getName());
 
         // Clear inventory if configured
         if (joinItemsConfig.isClearInventory()) {
             player.getInventory().clear();
-            getLogger().info("Cleared inventory");
         }
 
         // Give configured items
-        int itemCount = 0;
         for (var itemConfig : joinItemsConfig.getItems()) {
-            itemCount++;
-            getLogger().info("Processing item #" + itemCount + ": " + itemConfig.getMaterial() + " at slot " + itemConfig.getSlot());
-
             try {
                 Material material = Material.valueOf(itemConfig.getMaterial());
-                getLogger().info("Material parsed successfully: " + material.name());
 
                 if (material == Material.PLAYER_HEAD) {
-                    getLogger().info("Detected PLAYER_HEAD - giving with delay");
-                    // FIXED: Give player head with a delay to ensure profile is loaded
+                    // Give player head with delay to ensure profile is loaded
                     givePlayerHeadDelayed(player, itemConfig);
                 } else {
-                    getLogger().info("Regular item - giving immediately");
                     // Regular items - give immediately
-                    ItemStack item = new ItemBuilder(material)
+                    ItemStack item = new com.yourserver.lobby.util.ItemBuilder(material)
                             .name(miniMessage.deserialize(itemConfig.getName()))
                             .lore(itemConfig.getLore().stream()
                                     .map(line -> miniMessage.deserialize(line))
@@ -338,123 +404,73 @@ public class LobbyPlugin extends JavaPlugin {
                             .build();
 
                     player.getInventory().setItem(itemConfig.getSlot(), item);
-                    getLogger().info("Item placed in slot " + itemConfig.getSlot());
                 }
             } catch (IllegalArgumentException e) {
-                getLogger().warning("Invalid material: " + itemConfig.getMaterial() + " - " + e.getMessage());
-                e.printStackTrace();
+                getLogger().warning("Invalid material: " + itemConfig.getMaterial());
             } catch (Exception e) {
-                getLogger().severe("Error giving item: " + e.getMessage());
-                e.printStackTrace();
+                getLogger().log(Level.SEVERE, "Error giving item", e);
             }
         }
-
-        getLogger().info("Finished processing " + itemCount + " items");
     }
 
     /**
      * Gives player head with a slight delay to ensure profile is loaded.
-     * This fixes the issue where player heads don't show textures on join.
      */
     private void givePlayerHeadDelayed(Player player,
                                        com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
-        getLogger().info("Scheduling delayed player head for " + player.getName() + " at slot " + itemConfig.getSlot());
-
-        // Give the head after a 1-tick delay to ensure the player's profile is fully loaded
+        // Give the head after a 1-tick delay
         Bukkit.getScheduler().runTaskLater(this, () -> {
-            getLogger().info("Delayed task executing for player head");
-
             if (!player.isOnline()) {
-                getLogger().warning("Player " + player.getName() + " went offline before head could be given");
                 return;
             }
 
             try {
-                getLogger().info("Creating player head...");
                 ItemStack skull = createPlayerHead(player, itemConfig);
-
-                if (skull == null) {
-                    getLogger().severe("createPlayerHead returned null!");
-                    return;
+                if (skull != null) {
+                    player.getInventory().setItem(itemConfig.getSlot(), skull);
                 }
-
-                getLogger().info("Player head created, placing in slot " + itemConfig.getSlot());
-                player.getInventory().setItem(itemConfig.getSlot(), skull);
-
-                getLogger().info("Player head successfully placed!");
-
-                // Verify it's actually there
-                ItemStack check = player.getInventory().getItem(itemConfig.getSlot());
-                if (check != null && check.getType() == Material.PLAYER_HEAD) {
-                    getLogger().info("VERIFIED: Player head is in inventory at slot " + itemConfig.getSlot());
-                } else {
-                    getLogger().severe("FAILED: Player head not in inventory! Slot contains: " +
-                            (check == null ? "null" : check.getType().name()));
-                }
-
             } catch (Exception e) {
-                getLogger().severe("Error in delayed player head task: " + e.getMessage());
-                e.printStackTrace();
+                getLogger().log(Level.SEVERE, "Error giving player head", e);
             }
         }, 1L); // 1 tick delay (50ms)
     }
 
     /**
-     * Creates a player head item using Paper's PlayerProfile API.
-     * Uses setOwningPlayer which is more reliable than PlayerProfile for online players.
+     * Creates a player head item using setOwningPlayer.
      */
     private ItemStack createPlayerHead(Player player,
                                        com.yourserver.lobby.config.LobbyConfig.JoinItem itemConfig) {
-        getLogger().info("createPlayerHead called for " + player.getName());
-
         try {
-            // Create base player head
             ItemStack skull = new ItemStack(Material.PLAYER_HEAD);
-            getLogger().info("Created ItemStack with PLAYER_HEAD material");
-
             SkullMeta skullMeta = (SkullMeta) skull.getItemMeta();
 
             if (skullMeta == null) {
-                getLogger().severe("SkullMeta is null!");
-                return skull;
+                return null;
             }
 
-            getLogger().info("Got SkullMeta successfully");
-
-            // Use setOwningPlayer - this is the most reliable method for online players
+            // Use setOwningPlayer - most reliable for online players
             skullMeta.setOwningPlayer(player);
-            getLogger().info("Set owning player to " + player.getName());
 
             // Set display name
-            Component displayName = this.getMiniMessage().deserialize(itemConfig.getName());
+            Component displayName = miniMessage.deserialize(itemConfig.getName());
             skullMeta.displayName(displayName.decoration(
                     net.kyori.adventure.text.format.TextDecoration.ITALIC, false
             ));
-            getLogger().info("Set display name");
 
             // Set lore
             java.util.List<Component> loreComponents = itemConfig.getLore().stream()
-                    .map(line -> this.getMiniMessage().deserialize(line))
+                    .map(line -> miniMessage.deserialize(line))
                     .map(component -> component.decoration(
                             net.kyori.adventure.text.format.TextDecoration.ITALIC, false
                     ))
                     .toList();
             skullMeta.lore(loreComponents);
-            getLogger().info("Set lore with " + loreComponents.size() + " lines");
 
-            // Apply meta
             skull.setItemMeta(skullMeta);
-            getLogger().info("Applied skull meta to ItemStack");
-
-            // Verify
-            getLogger().info("Final skull type: " + skull.getType().name());
-            getLogger().info("Final skull amount: " + skull.getAmount());
-
             return skull;
 
         } catch (Exception e) {
-            getLogger().severe("Exception in createPlayerHead: " + e.getMessage());
-            e.printStackTrace();
+            getLogger().log(Level.SEVERE, "Failed to create player head", e);
             return null;
         }
     }

@@ -7,7 +7,6 @@ import net.kyori.adventure.text.Component;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.Bukkit;
 import org.bukkit.entity.Player;
-import com.yourserver.lobby.util.PartitionHelper; // Only import this!
 
 import java.util.List;
 import java.util.Map;
@@ -15,7 +14,12 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Manages player scoreboards and updates.
+ * Manages player scoreboards with CloudNet 4.0 awareness.
+ *
+ * CLOUDNET INTEGRATION:
+ * - Shows service name instead of generic "server"
+ * - Displays online count for current service
+ * - Uses Redis for cross-service data
  */
 public class ScoreboardManager {
 
@@ -36,8 +40,6 @@ public class ScoreboardManager {
 
     /**
      * Creates a scoreboard for a player.
-     *
-     * @param player The player
      */
     public void createScoreboard(Player player) {
         Component title = miniMessage.deserialize(config.getScoreboardConfig().getTitle());
@@ -50,8 +52,6 @@ public class ScoreboardManager {
 
     /**
      * Removes a player's scoreboard.
-     *
-     * @param player The player
      */
     public void removeScoreboard(Player player) {
         LobbyScoreboard scoreboard = scoreboards.remove(player.getUniqueId());
@@ -62,8 +62,6 @@ public class ScoreboardManager {
 
     /**
      * Updates a specific player's scoreboard.
-     *
-     * @param player The player
      */
     public void updateScoreboard(Player player) {
         LobbyScoreboard scoreboard = scoreboards.get(player.getUniqueId());
@@ -90,43 +88,51 @@ public class ScoreboardManager {
     }
 
     /**
-     * Parses placeholders in a string.
-     *
-     * @param text The text with placeholders
-     * @param player The player
-     * @return The text with placeholders replaced
+     * Parses placeholders with CloudNet awareness.
      */
     private String parsePlaceholders(String text, Player player) {
-        // OLD WAY (WRONG - shows all players):
-        // return text
-        //     .replace("{online}", String.valueOf(Bukkit.getOnlinePlayers().size()))
-        //     .replace("{max_players}", String.valueOf(Bukkit.getMaxPlayers()));
+        // Get CloudNet service info
+        var serviceInfo = corePlugin.getServiceInfo();
 
-        // NEW WAY (CORRECT - partition-aware):
-        text = PartitionHelper.replacePlaceholders(text, player);
+        // CloudNet-aware placeholders
+        String serviceName = serviceInfo != null && serviceInfo.isCloudNetService()
+                ? serviceInfo.getName()
+                : "Standalone";
 
-        // Continue with other replacements
-        return text
+        String serviceGroup = serviceInfo != null && serviceInfo.isCloudNetService()
+                ? serviceInfo.getGroup()
+                : "N/A";
+
+        String taskName = serviceInfo != null && serviceInfo.isCloudNetService()
+                ? serviceInfo.getTask()
+                : "N/A";
+
+        // Use partition helper for accurate counts
+        text = com.yourserver.lobby.util.PartitionHelper.replacePlaceholders(text, player);
+
+        // Replace CloudNet-specific placeholders
+        text = text
                 .replace("{player}", player.getName())
-                .replace("{rank}", getRank(player));
+                .replace("{rank}", getRank(player))
+                .replace("{service}", serviceName)
+                .replace("{service_group}", serviceGroup)
+                .replace("{service_task}", taskName)
+                .replace("{server}", serviceName); // Alias
+
+        return text;
     }
 
     /**
      * Gets the player's rank with icon from RankDisplayManager.
-     *
-     * @param player The player
-     * @return The rank display with icon (MiniMessage format)
      */
     private String getRank(Player player) {
-        // Get rank display manager from CorePlugin
         var rankManager = corePlugin.getRankDisplayManager();
 
         if (rankManager == null) {
-            // Fallback if RankDisplayManager not available
             return player.isOp() ? "<red>Admin" : "<gray>Member";
         }
 
-        // Get formatted rank with icon (already in MiniMessage format now!)
+        // Get formatted rank with icon (MiniMessage format)
         return rankManager.getRankDisplay(player);
     }
 

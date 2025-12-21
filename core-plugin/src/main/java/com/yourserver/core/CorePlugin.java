@@ -18,31 +18,32 @@ import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 
 /**
- * CorePlugin - FULLY MODERNIZED FOR MYSQL + CLOUDNET 4.0
+ * CorePlugin - MySQL + CloudNet 4.0 Ready
  *
- * KEY IMPROVEMENTS:
- * ✅ MySQL database with HikariCP (replaces JSON)
- * ✅ Async operations (non-blocking)
- * ✅ Connection pooling (scalable)
- * ✅ Auto-reconnect on failure
- * ✅ Batch operations for performance
- * ✅ Health monitoring
- * ✅ CloudNet service detection
- * ✅ Redis pub/sub messaging
- * ✅ Proper error handling
- * ✅ Graceful shutdown
- * ✅ Thread-safe caching
- * ✅ ACID database transactions
+ * CLOUDNET 4.0 INTEGRATION:
+ * ✅ Service detection via system properties
+ * ✅ Shared MySQL database across all services
+ * ✅ Redis pub/sub for cross-server messaging
+ * ✅ Proper async operations (non-blocking)
+ * ✅ Connection pooling with HikariCP
+ * ✅ Health monitoring and auto-reconnect
+ * ✅ Graceful shutdown with data persistence
  *
  * ARCHITECTURE:
  * - DatabaseManager: HikariCP connection pool
- * - Repositories: Clean data access layer
+ * - Repositories: Clean MySQL data access
  * - PlayerDataManager: Caffeine cache + async saves
- * - RedisManager: Cross-server messaging
+ * - RedisManager: Cross-server pub/sub messaging
  * - Scheduled tasks: Auto-save, health checks
  *
+ * CLOUDNET SERVICE PROPERTIES:
+ * - cloudnet.service.name (e.g., "Lobby-1")
+ * - cloudnet.service.group (e.g., "Lobby")
+ * - cloudnet.service.task (e.g., "Lobby")
+ * - cloudnet.service.uid (unique service ID)
+ *
  * @author MCBZH
- * @version 2.0.0 - MySQL Edition
+ * @version 2.1.0 - CloudNet 4.0 Edition
  */
 public class CorePlugin extends JavaPlugin {
 
@@ -56,7 +57,7 @@ public class CorePlugin extends JavaPlugin {
     // ===== CONFIGURATION =====
     private DatabaseConfig databaseConfig;
 
-    // ===== REPOSITORIES (MySQL) =====
+    // ===== REPOSITORIES =====
     private MySQLPlayerDataRepository playerDataRepository;
     private MySQLPlayerStatsRepository playerStatsRepository;
 
@@ -64,24 +65,23 @@ public class CorePlugin extends JavaPlugin {
     private ScheduledExecutorService asyncExecutor;
 
     // ===== CLOUDNET INFO =====
-    private String serviceName;
-    private String serviceGroup;
-    private boolean isCloudNetService;
+    private CloudNetServiceInfo serviceInfo;
 
     // ===== LIFECYCLE: LOAD =====
     @Override
     public void onLoad() {
         getLogger().info("╔════════════════════════════════════════╗");
         getLogger().info("║  CorePlugin v" + getDescription().getVersion() + "                  ║");
-        getLogger().info("║  MySQL + Redis + CloudNet Ready        ║");
+        getLogger().info("║  MySQL + Redis + CloudNet 4.0          ║");
         getLogger().info("╚════════════════════════════════════════╝");
 
         // Save default configuration files
         saveDefaultConfig();
         saveResource("database.yml", false);
 
-        // Detect CloudNet environment
-        detectCloudNetService();
+        // Detect CloudNet 4.0 environment
+        this.serviceInfo = CloudNetServiceInfo.detect(getLogger());
+        serviceInfo.logInfo();
     }
 
     // ===== LIFECYCLE: ENABLE =====
@@ -107,6 +107,7 @@ public class CorePlugin extends JavaPlugin {
             initializeRedis();
             if (redisManager != null && redisManager.isConnected()) {
                 getLogger().info("✓ Redis connected");
+                subscribeToCloudNetChannels();
             } else {
                 getLogger().warning("⚠ Redis disabled (cross-server features unavailable)");
             }
@@ -141,14 +142,22 @@ public class CorePlugin extends JavaPlugin {
             getLogger().info("╔════════════════════════════════════════╗");
             getLogger().info("║  ✓ COREPLUGIN ENABLED SUCCESSFULLY     ║");
             getLogger().info("╠════════════════════════════════════════╣");
-            if (isCloudNetService) {
-                getLogger().info("║  Service: " + String.format("%-28s", serviceName) + " ║");
-                getLogger().info("║  Group:   " + String.format("%-28s", serviceGroup) + " ║");
+            if (serviceInfo.isCloudNetService()) {
+                getLogger().info("║  Service: " + String.format("%-28s", serviceInfo.getName()) + " ║");
+                getLogger().info("║  Group:   " + String.format("%-28s", serviceInfo.getGroup()) + " ║");
+                getLogger().info("║  Task:    " + String.format("%-28s", serviceInfo.getTask()) + " ║");
+                getLogger().info("║  UID:     " + String.format("%-28s", serviceInfo.getUid()) + " ║");
             }
             getLogger().info("║  Database: MySQL (HikariCP)            ║");
             getLogger().info("║  Cache: Caffeine                       ║");
+            getLogger().info("║  Redis: " + String.format("%-29s", (redisManager != null && redisManager.isConnected() ? "Connected" : "Disabled")) + "║");
             getLogger().info("║  Startup: " + elapsed + "ms" + " ".repeat(25 - String.valueOf(elapsed).length()) + "║");
             getLogger().info("╚════════════════════════════════════════╝");
+
+            // Send startup message to Redis
+            if (redisManager != null && redisManager.isConnected()) {
+                sendServiceStartupMessage();
+            }
 
         } catch (Exception e) {
             getLogger().log(Level.SEVERE, "╔════════════════════════════════════════╗", e);
@@ -165,6 +174,11 @@ public class CorePlugin extends JavaPlugin {
         getLogger().info("╔════════════════════════════════════════╗");
         getLogger().info("║  Shutting down CorePlugin...           ║");
         getLogger().info("╚════════════════════════════════════════╝");
+
+        // Send shutdown message to Redis
+        if (redisManager != null && redisManager.isConnected()) {
+            sendServiceShutdownMessage();
+        }
 
         // 1. Save all player data
         if (playerDataManager != null) {
@@ -259,7 +273,6 @@ public class CorePlugin extends JavaPlugin {
         try {
             this.redisManager = new RedisManager(getLogger());
             this.redisManager.initialize(databaseConfig.getRedisConfig());
-            subscribeToCloudNetChannels();
         } catch (Exception e) {
             getLogger().log(Level.WARNING, "Redis initialization failed", e);
             getLogger().warning("Continuing without Redis (cross-server features disabled)");
@@ -320,21 +333,16 @@ public class CorePlugin extends JavaPlugin {
             }
         }, 30, 30, TimeUnit.SECONDS);
 
-        // Pool stats logging every 5 minutes (for monitoring)
+        // Pool stats logging every 5 minutes
         asyncExecutor.scheduleAtFixedRate(() -> {
             getLogger().info("Pool: " + databaseManager.getPoolStats());
         }, 5, 5, TimeUnit.MINUTES);
-    }
 
-    private void detectCloudNetService() {
-        this.serviceName = System.getProperty("cloudnet.service.name");
-        this.serviceGroup = System.getProperty("cloudnet.service.group");
-        this.isCloudNetService = serviceName != null;
-
-        if (isCloudNetService) {
-            getLogger().info("Running on CloudNet: " + serviceName + " (" + serviceGroup + ")");
-        } else {
-            getLogger().info("Running in standalone mode");
+        // Service heartbeat (if Redis is available)
+        if (redisManager != null && redisManager.isConnected()) {
+            asyncExecutor.scheduleAtFixedRate(() -> {
+                sendServiceHeartbeat();
+            }, 10, 10, TimeUnit.SECONDS);
         }
     }
 
@@ -343,19 +351,78 @@ public class CorePlugin extends JavaPlugin {
             return;
         }
 
+        // Subscribe to service events
+        redisManager.subscribe("cloudnet:service:start", message ->
+                getLogger().info("Service started: " + message)
+        );
+
+        redisManager.subscribe("cloudnet:service:stop", message ->
+                getLogger().info("Service stopped: " + message)
+        );
+
+        // Subscribe to player events
         redisManager.subscribe("player:join", message ->
-                getLogger().fine("Player joined server: " + message)
+                getLogger().fine("Player joined network: " + message)
         );
 
         redisManager.subscribe("player:quit", message ->
-                getLogger().fine("Player quit server: " + message)
+                getLogger().fine("Player quit network: " + message)
         );
 
+        // Subscribe to game state updates
         redisManager.subscribe("game:state", message ->
                 getLogger().fine("Game state update: " + message)
         );
 
         getLogger().info("Subscribed to CloudNet Redis channels");
+    }
+
+    // ===== CLOUDNET MESSAGING =====
+
+    private void sendServiceStartupMessage() {
+        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+            return;
+        }
+
+        String message = String.format(
+                "{\"service\":\"%s\",\"group\":\"%s\",\"event\":\"startup\",\"timestamp\":%d}",
+                serviceInfo.getName(),
+                serviceInfo.getGroup(),
+                System.currentTimeMillis()
+        );
+
+        redisManager.publish("cloudnet:service:start", message);
+    }
+
+    private void sendServiceShutdownMessage() {
+        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+            return;
+        }
+
+        String message = String.format(
+                "{\"service\":\"%s\",\"group\":\"%s\",\"event\":\"shutdown\",\"timestamp\":%d}",
+                serviceInfo.getName(),
+                serviceInfo.getGroup(),
+                System.currentTimeMillis()
+        );
+
+        redisManager.publish("cloudnet:service:stop", message);
+    }
+
+    private void sendServiceHeartbeat() {
+        if (redisManager == null || !serviceInfo.isCloudNetService()) {
+            return;
+        }
+
+        String message = String.format(
+                "{\"service\":\"%s\",\"players\":%d,\"tps\":%.2f,\"timestamp\":%d}",
+                serviceInfo.getName(),
+                getServer().getOnlinePlayers().size(),
+                getServer().getTPS()[0],
+                System.currentTimeMillis()
+        );
+
+        redisManager.publish("cloudnet:service:heartbeat", message);
     }
 
     // ===== PUBLIC API =====
@@ -392,16 +459,8 @@ public class CorePlugin extends JavaPlugin {
         return databaseConfig;
     }
 
-    public String getServiceName() {
-        return serviceName;
-    }
-
-    public String getServiceGroup() {
-        return serviceGroup;
-    }
-
-    public boolean isCloudNetService() {
-        return isCloudNetService;
+    public CloudNetServiceInfo getServiceInfo() {
+        return serviceInfo;
     }
 
     public void reloadConfiguration() {
@@ -414,5 +473,56 @@ public class CorePlugin extends JavaPlugin {
         return databaseManager != null &&
                 databaseManager.isConnected() &&
                 playerDataManager != null;
+    }
+
+    // ===== CLOUDNET SERVICE INFO CLASS =====
+
+    public static class CloudNetServiceInfo {
+        private final String name;
+        private final String group;
+        private final String task;
+        private final String uid;
+        private final boolean isCloudNetService;
+
+        private CloudNetServiceInfo(String name, String group, String task, String uid) {
+            this.name = name;
+            this.group = group;
+            this.task = task;
+            this.uid = uid;
+            this.isCloudNetService = name != null;
+        }
+
+        public static CloudNetServiceInfo detect(java.util.logging.Logger logger) {
+            String name = System.getProperty("cloudnet.service.name");
+            String group = System.getProperty("cloudnet.service.group");
+            String task = System.getProperty("cloudnet.service.task");
+            String uid = System.getProperty("cloudnet.service.uid");
+
+            if (name != null) {
+                logger.info("Detected CloudNet 4.0 service: " + name);
+            } else {
+                logger.info("Running in standalone mode (not CloudNet)");
+            }
+
+            return new CloudNetServiceInfo(name, group, task, uid);
+        }
+
+        public void logInfo() {
+            if (!isCloudNetService) {
+                return;
+            }
+
+            java.util.logging.Logger.getLogger("CorePlugin").info("CloudNet Service Info:");
+            java.util.logging.Logger.getLogger("CorePlugin").info("  Name:  " + name);
+            java.util.logging.Logger.getLogger("CorePlugin").info("  Group: " + group);
+            java.util.logging.Logger.getLogger("CorePlugin").info("  Task:  " + task);
+            java.util.logging.Logger.getLogger("CorePlugin").info("  UID:   " + uid);
+        }
+
+        public String getName() { return name; }
+        public String getGroup() { return group; }
+        public String getTask() { return task; }
+        public String getUid() { return uid; }
+        public boolean isCloudNetService() { return isCloudNetService; }
     }
 }

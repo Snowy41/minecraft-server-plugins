@@ -13,9 +13,11 @@ import com.yourserver.social.manager.ClanManager;
 import com.yourserver.social.manager.FriendManager;
 import com.yourserver.social.manager.PartyManager;
 import com.yourserver.social.messaging.SocialMessenger;
+import com.zaxxer.hikari.HikariDataSource;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.plugin.java.JavaPlugin;
 
+import javax.sql.DataSource;
 import java.util.logging.Level;
 
 /**
@@ -80,14 +82,17 @@ public class SocialPlugin extends JavaPlugin {
             // === PHASE 3: DATABASE ===
             getLogger().info("Initializing MySQL repositories...");
 
+            // Get HikariDataSource from DatabaseManager
+            HikariDataSource hikariDataSource = corePlugin.getDatabaseManager().getDataSource();
+
             MySQLFriendRepository friendRepo = new MySQLFriendRepository(
-                    corePlugin.getDatabaseManager().getDataSource(),
+                    hikariDataSource,
                     corePlugin.getAsyncExecutor(),
                     getLogger()
             );
 
             MySQLClanRepository clanRepo = new MySQLClanRepository(
-                    corePlugin.getDatabaseManager().getDataSource(),
+                    hikariDataSource,
                     corePlugin.getAsyncExecutor(),
                     getLogger()
             );

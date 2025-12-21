@@ -14,6 +14,7 @@ import java.util.logging.Logger;
 
 /**
  * MySQL implementation of clan storage.
+ * Uses CorePlugin's HikariCP connection pool.
  */
 public class MySQLClanRepository {
 

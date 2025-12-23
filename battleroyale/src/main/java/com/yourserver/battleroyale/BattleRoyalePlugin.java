@@ -6,19 +6,25 @@ import com.yourserver.battleroyale.config.BattleRoyaleConfig;
 import com.yourserver.battleroyale.game.GameManager;
 import com.yourserver.battleroyale.listener.GameListener;
 import com.yourserver.battleroyale.listener.PlayerConnectionListener;
+import com.yourserver.battleroyale.redis.RedisGameStateBroadcaster;
 import com.yourserver.core.CorePlugin;
 import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.plugin.java.JavaPlugin;
 import com.yourserver.battleroyale.listener.MinimalProtectionListener;
-
 
 import java.util.logging.Level;
 
 /*
  * BattleRoyale Plugin - Main Class
  *
+ * UPDATED FOR GENERIC LOBBY SYSTEM:
+ * - Uses RedisGameStateBroadcaster (generic, reusable)
+ * - Works with GameLobbyPlugin on lobby servers
+ * - Detects CloudNet service name automatically
+ * - Broadcasts game state to Redis for real-time GUI updates
+ *
  * Game Flow:
- * 1. WAITING - Players join pre-game lobby
+ * 1. WAITING - Players join pre-game lobby (broadcasts to Redis)
  * 2. STARTING - Countdown before game starts
  * 3. ACTIVE - Players fight in shrinking zone
  * 4. DEATHMATCH - Final arena phase (after 1 hour)
@@ -31,12 +37,11 @@ public class BattleRoyalePlugin extends JavaPlugin {
     private BattleRoyaleConfig config;
     private GameManager gameManager;
     private GameListener gameListener;
+    private RedisGameStateBroadcaster broadcaster;
 
     @Override
     public void onLoad() {
         getLogger().info("Loading BattleRoyalePlugin...");
-
-        // Save default config
         saveDefaultConfig();
     }
 
@@ -63,7 +68,21 @@ public class BattleRoyalePlugin extends JavaPlugin {
             gameManager = new GameManager(this, corePlugin);
             getLogger().info("✓ Game manager initialized");
 
-            // 5. Register listeners
+            // 5. Initialize generic Redis broadcaster
+            if (corePlugin.getRedisManager() != null) {
+                broadcaster = new RedisGameStateBroadcaster(
+                        this,
+                        corePlugin,
+                        "battleroyale",  // Gamemode ID (must match GameLobbyPlugin config)
+                        "br"             // Channel prefix
+                );
+                broadcaster.initialize();
+                getLogger().info("✓ Generic Redis broadcaster initialized");
+            } else {
+                getLogger().warning("⚠ Redis not available - lobby GUI will not work!");
+            }
+
+            // 6. Register listeners
             gameListener = new GameListener(this, gameManager);
 
             getServer().getPluginManager().registerEvents(
@@ -80,7 +99,7 @@ public class BattleRoyalePlugin extends JavaPlugin {
             );
             getLogger().info("✓ Event listeners registered");
 
-            // 6. Register commands
+            // 7. Register commands
             BattleRoyaleCommand brCommand = new BattleRoyaleCommand(this, gameManager);
             getCommand("battleroyale").setExecutor(brCommand);
             getCommand("battleroyale").setTabCompleter(brCommand);
@@ -91,12 +110,13 @@ public class BattleRoyalePlugin extends JavaPlugin {
 
             getLogger().info("✓ Commands registered");
 
-
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             getLogger().info("BattleRoyale Plugin enabled successfully!");
+            getLogger().info("✓ CloudNet Service: " + getServiceName());
             getLogger().info("✓ Game modes: Solo" + (config.isTeamsEnabled() ? ", Teams" : ""));
             getLogger().info("✓ Max players: " + config.getMaxPlayers());
             getLogger().info("✓ Zone phases: " + config.getZonePhaseCount());
+            getLogger().info("✓ Redis broadcasting: " + (broadcaster != null ? "ACTIVE" : "DISABLED"));
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
         } catch (Exception e) {
@@ -108,6 +128,12 @@ public class BattleRoyalePlugin extends JavaPlugin {
     @Override
     public void onDisable() {
         getLogger().info("Disabling BattleRoyalePlugin...");
+
+        // Stop Redis broadcaster
+        if (broadcaster != null) {
+            broadcaster.shutdown();
+            getLogger().info("✓ Redis broadcaster stopped");
+        }
 
         // Shutdown game manager
         if (gameManager != null) {
@@ -127,7 +153,17 @@ public class BattleRoyalePlugin extends JavaPlugin {
         getLogger().info("Configuration reloaded");
     }
 
-    // ===== Public API =====
+    /**
+     * Gets the CloudNet service name.
+     *
+     * @return Service name (e.g., "BattleRoyale-1")
+     */
+    private String getServiceName() {
+        String name = System.getProperty("cloudnet.service.name");
+        return name != null ? name : "Unknown";
+    }
+
+    // ===== PUBLIC API =====
 
     public CorePlugin getCorePlugin() {
         return corePlugin;
@@ -147,5 +183,9 @@ public class BattleRoyalePlugin extends JavaPlugin {
 
     public GameListener getGameListener() {
         return gameListener;
+    }
+
+    public RedisGameStateBroadcaster getBroadcaster() {
+        return broadcaster;
     }
 }

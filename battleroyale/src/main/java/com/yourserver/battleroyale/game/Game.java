@@ -25,14 +25,16 @@ import java.util.stream.Collectors;
 /**
  * Represents a single battle royale game instance.
  *
+ * UPDATED: Now broadcasts state changes to Redis for lobby GUI.
+ *
  * Lifecycle:
- * 1. Create game (WAITING state)
- * 2. Players join pre-game lobby
- * 3. Start countdown when min players reached (STARTING)
- * 4. Players drop into map (ACTIVE)
+ * 1. Create game (WAITING state) → broadcasts
+ * 2. Players join pre-game lobby → broadcasts player count
+ * 3. Start countdown when min players reached (STARTING) → broadcasts
+ * 4. Players drop into map (ACTIVE) → broadcasts
  * 5. Zone shrinks, players fight
- * 6. After time/small zone: Deathmatch (DEATHMATCH)
- * 7. Winner determined, stats saved (ENDING)
+ * 6. After time/small zone: Deathmatch (DEATHMATCH) → broadcasts
+ * 7. Winner determined, stats saved (ENDING) → broadcasts
  * 8. Game cleanup
  */
 public class Game {
@@ -94,18 +96,25 @@ public class Game {
         this.lootManager = new LootManager(plugin);
         this.scheduler = new GameScheduler(plugin, this);
         this.spectatorManager = new SpectatorManager(this);
+
+        // Broadcast initial state
+        broadcastState();
     }
 
     // ===== STATE MANAGEMENT =====
 
     /**
      * Transitions the game to a new state.
+     * UPDATED: Now broadcasts state to Redis via generic broadcaster.
      */
     public void setState(@NotNull GameState newState) {
         GameState oldState = this.state;
         this.state = newState;
 
         plugin.getLogger().info("Game " + id + " state: " + oldState + " → " + newState);
+
+        // Broadcast state change to Redis using generic broadcaster
+        broadcastState();
 
         if (scheduler != null) {
             scheduler.onStateChange(newState);
@@ -135,6 +144,21 @@ public class Game {
         }
     }
 
+    /**
+     * Broadcasts current game state to Redis using generic broadcaster.
+     */
+    private void broadcastState() {
+        if (plugin.getBroadcaster() != null) {
+            plugin.getBroadcaster().broadcastState(
+                    state.name(),           // State: WAITING, STARTING, ACTIVE, etc.
+                    players.size(),         // Current players
+                    maxPlayers,             // Max players
+                    alivePlayers.size(),    // Alive players
+                    id                      // Game ID
+            );
+        }
+    }
+
     private void onStarting() {
         plugin.getLogger().info("Game " + id + " starting countdown...");
 
@@ -151,8 +175,6 @@ public class Game {
                 }
             }
         }
-
-        // Scheduler automatically starts countdown, no manual timer needed
     }
 
     private void onActive() {
@@ -276,20 +298,8 @@ public class Game {
             deathmatchArena.remove();
             deathmatchArena = null;
         }
-
-        // TODO: Display detailed statistics
-        // TODO: Save statistics to database
-        // TODO: Reward players
-        // TODO: Schedule cleanup and world deletion
     }
 
-    /**
-     * FIXED: Schedules game cleanup after ENDING state.
-     * Waits 10 seconds to display winner/stats, then:
-     * - Kicks all players back to spawn
-     * - Clears all data structures
-     * - Prepares game for removal by GameManager
-     */
     private void scheduleCleanup() {
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             plugin.getLogger().info("Cleaning up game " + id + "...");
@@ -319,6 +329,7 @@ public class Game {
 
     /**
      * Adds a player to the game.
+     * UPDATED: Broadcasts player count change.
      */
     public boolean addPlayer(@NotNull GamePlayer player) {
         if (!state.canJoin()) {
@@ -334,6 +345,9 @@ public class Game {
         plugin.getLogger().info("Player " + player.getName() + " joined game " + id +
                 " (" + players.size() + "/" + maxPlayers + ")");
 
+        // Broadcast player count update
+        broadcastState();
+
         if (players.size() >= minPlayers && state == GameState.WAITING) {
             setState(GameState.STARTING);
         }
@@ -343,6 +357,7 @@ public class Game {
 
     /**
      * Removes a player from the game.
+     * UPDATED: Broadcasts player count change.
      */
     public void removePlayer(@NotNull UUID uuid) {
         GamePlayer player = players.remove(uuid);
@@ -351,6 +366,8 @@ public class Game {
 
         if (player != null) {
             plugin.getLogger().info("Player " + player.getName() + " left game " + id);
+            // Broadcast player count update
+            broadcastState();
         }
         checkGameEnd();
     }
@@ -386,6 +403,9 @@ public class Game {
                     bukkitPlayer.sendMessage(Component.empty());
                 }
             }
+
+            // Broadcast alive count update
+            broadcastState();
             checkGameEnd();
         }
     }
@@ -404,8 +424,6 @@ public class Game {
             }
             setState(GameState.ENDING);
         }
-
-        // TODO: Team-Mode (1 Team remaining)
     }
 
     /**

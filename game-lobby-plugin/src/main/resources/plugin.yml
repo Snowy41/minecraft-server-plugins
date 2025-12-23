@@ -1,0 +1,82 @@
+name: GameLobbyPlugin
+version: 1.0.0
+main: com.yourserver.gamelobby.GameLobbyPlugin
+api-version: 1.21
+author: YourServer
+description: Generic game lobby system with CloudNet and Redis integration
+
+# Dependencies
+depend:
+  - CorePlugin
+
+softdepend:
+  - APIModule
+
+# Commands are dynamically registered based on config.yml
+# Examples: /battleroyale, /skywars, /bedwars, etc.
+commands:
+  battleroyale:
+    description: Open BattleRoyale server menu
+    usage: /<command>
+    aliases: [br]
+    permission: gamelobby.use.battleroyale
+  
+  skywars:
+    description: Open SkyWars server menu
+    usage: /<command>
+    aliases: [sw]
+    permission: gamelobby.use.skywars
+  
+  bedwars:
+    description: Open BedWars server menu
+    usage: /<command>
+    aliases: [bw]
+    permission: gamelobby.use.bedwars
+  
+  duels:
+    description: Open Duels server menu
+    usage: /<command>
+    permission: gamelobby.use.duels
+  
+  murder:
+    description: Open The Murder server menu
+    usage: /<command>
+    permission: gamelobby.use.murder
+
+# Permissions
+permissions:
+  gamelobby.*:
+    description: All GameLobby permissions
+    default: true
+    children:
+      gamelobby.use.*: true
+  
+  gamelobby.use.*:
+    description: Access to all gamemode menus
+    default: true
+    children:
+      gamelobby.use.battleroyale: true
+      gamelobby.use.skywars: true
+      gamelobby.use.bedwars: true
+      gamelobby.use.duels: true
+      gamelobby.use.murder: true
+  
+  gamelobby.use.battleroyale:
+    description: Use BattleRoyale menu
+    default: true
+  
+  gamelobby.use.skywars:
+    description: Use SkyWars menu
+    default: true
+  
+  gamelobby.use.bedwars:
+    description: Use BedWars menu
+    default: true
+  
+  gamelobby.use.duels:
+    description: Use Duels menu
+    default: true
+  
+  gamelobby.use.murder:
+    description: Use The Murder menu
+    default: true

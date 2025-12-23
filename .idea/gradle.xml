@@ -8,9 +8,12 @@
         <option name="modules">
           <set>
             <option value="$PROJECT_DIR$" />
+            <option value="$PROJECT_DIR$/GameLobbyPlugin" />
             <option value="$PROJECT_DIR$/api-module" />
             <option value="$PROJECT_DIR$/battleroyale" />
+            <option value="$PROJECT_DIR$/battleroyale-lobby-plugin" />
             <option value="$PROJECT_DIR$/core-plugin" />
+            <option value="$PROJECT_DIR$/game-lobby-plugin" />
             <option value="$PROJECT_DIR$/lobby-plugin" />
             <option value="$PROJECT_DIR$/npc-plugin" />
             <option value="$PROJECT_DIR$/partition" />

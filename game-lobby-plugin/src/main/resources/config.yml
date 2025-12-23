@@ -1,0 +1,176 @@
+# ===================================================
+# Game Lobby Plugin Configuration
+# ===================================================
+# This plugin provides a generic lobby system for
+# joining CloudNet game services.
+#
+# Supports ANY gamemode:
+# - BattleRoyale
+# - SkyWars
+# - BedWars
+# - Duels
+# - and more!
+# ===================================================
+
+# ===================================================
+# Gamemode Configuration
+# ===================================================
+# Define each gamemode here.
+# Each gamemode creates:
+# - A command (e.g., /battleroyale, /skywars)
+# - A GUI menu with live server list
+# - Redis integration for real-time updates
+# ===================================================
+
+gamemodes:
+
+  # BattleRoyale Gamemode
+  battleroyale:
+    # Enable this gamemode?
+    enabled: true
+
+    # Display name (shown in GUI title and messages)
+    display-name: "§c⚔ BattleRoyale"
+
+    # CloudNet service name prefix
+    # Services like "BattleRoyale-1", "BattleRoyale-2" will be detected
+    service-prefix: "BattleRoyale-"
+
+    # Icon material for this gamemode
+    icon-material: "DIAMOND_SWORD"
+
+    # Description (shown in help/info)
+    description:
+      - "§7Last player standing wins!"
+      - "§7100 players, massive map"
+      - "§7Loot, fight, survive"
+
+  # SkyWars Gamemode (example)
+  skywars:
+    enabled: false
+    display-name: "§b☁ SkyWars"
+    service-prefix: "SkyWars-"
+    icon-material: "FEATHER"
+    description:
+      - "§7Fight on floating islands"
+      - "§78-12 players per game"
+      - "§7Quick matches, intense action"
+
+  # BedWars Gamemode (example)
+  bedwars:
+    enabled: false
+    display-name: "§e🛏 BedWars"
+    service-prefix: "BedWars-"
+    icon-material: "RED_BED"
+    description:
+      - "§7Protect your bed, destroy others"
+      - "§74v4v4v4 team battles"
+      - "§7Strategic gameplay"
+
+  # Duels Gamemode (example)
+  duels:
+    enabled: false
+    display-name: "§6⚔ Duels"
+    service-prefix: "Duels-"
+    icon-material: "IRON_SWORD"
+    description:
+      - "§71v1 competitive matches"
+      - "§7Multiple kits available"
+      - "§7Ranked & unranked modes"
+
+  # The Murder Gamemode (example)
+  murder:
+    enabled: false
+    display-name: "§4🔪 The Murder"
+    service-prefix: "Murder-"
+    icon-material: "IRON_SWORD"
+    description:
+      - "§7One murderer, one detective"
+      - "§7Find the killer before it's too late"
+      - "§7Social deduction mystery"
+
+# ===================================================
+# Menu Settings
+# ===================================================
+menu:
+  # How often to refresh open menus (in seconds)
+  refresh-interval: 2
+
+  # Menu size (must be multiple of 9, max 54)
+  size: 54
+
+  # Show player count in server items?
+  show-player-count: true
+
+  # Show alive count (for elimination games)?
+  show-alive-count: true
+
+# ===================================================
+# Service Detection Settings
+# ===================================================
+service-detection:
+  # How long (seconds) before marking a service as stale?
+  # Services that don't send heartbeat within this time are marked offline
+  heartbeat-timeout: 30
+
+  # How often (seconds) to check for stale services?
+  stale-check-interval: 10
+
+# ===================================================
+# Messages
+# ===================================================
+messages:
+  # When player tries to join a full server
+  server-full: "§cThat server is full!"
+
+  # When player tries to join an offline server
+  server-offline: "§cThat server is offline!"
+
+  # When player tries to join during active game
+  cannot-join: "§cYou cannot join that server right now!"
+
+  # When server is not found
+  server-not-found: "§cThat server is not available!"
+
+  # When connecting to server
+  connecting: "§aConnecting to {server}..."
+
+  # When menu is refreshed
+  menu-refreshed: "§aServer list refreshed!"
+
+  # When gamemode is not enabled
+  gamemode-disabled: "§cThat gamemode is not enabled!"
+
+  # Console-only command message
+  players-only: "§cOnly players can use this command!"
+
+# ===================================================
+# Redis Configuration
+# ===================================================
+# Redis settings are configured in CorePlugin's database.yml
+# This plugin uses Redis pub/sub for real-time updates:
+#
+# Channels (per gamemode):
+# - {gamemode}:state      - Game state updates
+# - {gamemode}:heartbeat  - Service heartbeats
+# - {gamemode}:control    - Control messages
+#
+# Examples:
+# - br:state (BattleRoyale state)
+# - sw:heartbeat (SkyWars heartbeat)
+# - bw:control (BedWars control)
+# ===================================================
+
+# ===================================================
+# Advanced Settings
+# ===================================================
+advanced:
+  # Enable debug logging?
+  debug: false
+
+  # Maximum services to display per gamemode
+  max-services-displayed: 45
+
+  # Auto-remove offline services after X minutes?
+  auto-remove-offline-services: true
+  auto-remove-offline-after-minutes: 5

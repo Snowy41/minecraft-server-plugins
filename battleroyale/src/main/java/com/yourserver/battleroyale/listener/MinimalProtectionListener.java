@@ -17,14 +17,6 @@ import org.bukkit.event.player.PlayerDropItemEvent;
 
 /**
  * Minimal protection - ONLY for pre-game lobby.
- *
- * During actual gameplay (ACTIVE/DEATHMATCH):
- * - Players CAN break/place blocks (for strategy!)
- * - Players CAN take hunger damage
- * - Players CAN PvP
- * - It's full survival battle royale!
- *
- * Only protects WAITING/STARTING phases (pre-game lobby above map).
  */
 public class MinimalProtectionListener implements Listener {
 
@@ -36,7 +28,6 @@ public class MinimalProtectionListener implements Listener {
 
     /**
      * Prevent block breaking ONLY in pre-game lobby (WAITING/STARTING).
-     * During game: ALLOW everything!
      */
     @EventHandler(priority = EventPriority.HIGH, ignoreCancelled = true)
     public void onBlockBreak(BlockBreakEvent event) {
@@ -47,13 +38,10 @@ public class MinimalProtectionListener implements Listener {
             return;
         }
 
-        // ONLY prevent in lobby (WAITING/STARTING)
         if (game.getState() == GameState.WAITING || game.getState() == GameState.STARTING) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("Wait for game to start!", NamedTextColor.YELLOW));
         }
-
-        // During ACTIVE/DEATHMATCH: Allow! (survival gameplay)
     }
 
     /**
@@ -68,7 +56,6 @@ public class MinimalProtectionListener implements Listener {
             return;
         }
 
-        // ONLY prevent in lobby
         if (game.getState() == GameState.WAITING || game.getState() == GameState.STARTING) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("Wait for game to start!", NamedTextColor.YELLOW));
@@ -93,7 +80,6 @@ public class MinimalProtectionListener implements Listener {
             return;
         }
 
-        // ONLY prevent in lobby
         if (game.getState() == GameState.WAITING || game.getState() == GameState.STARTING) {
             event.setCancelled(true);
             attacker.sendActionBar(Component.text("Wait for game to start!", NamedTextColor.YELLOW));
@@ -102,7 +88,6 @@ public class MinimalProtectionListener implements Listener {
 
     /**
      * Disable hunger ONLY in pre-game lobby.
-     * During game: normal hunger (survival!)
      */
     @EventHandler(priority = EventPriority.NORMAL, ignoreCancelled = true)
     public void onFoodLevelChange(FoodLevelChangeEvent event) {
@@ -117,15 +102,11 @@ public class MinimalProtectionListener implements Listener {
 
         GameState state = game.getState();
 
-        // Disable hunger ONLY in lobby
         if (state == GameState.WAITING || state == GameState.STARTING) {
             event.setCancelled(true);
             player.setFoodLevel(20);
             player.setSaturation(20.0f);
         }
-
-        // During ACTIVE: Allow hunger! (survival gameplay)
-        // During DEATHMATCH: Also disable for fairness
         if (state == GameState.DEATHMATCH) {
             event.setCancelled(true);
             player.setFoodLevel(20);
@@ -145,7 +126,6 @@ public class MinimalProtectionListener implements Listener {
             return;
         }
 
-        // Prevent item dropping ONLY in lobby
         if (game.getState() == GameState.WAITING || game.getState() == GameState.STARTING) {
             event.setCancelled(true);
             player.sendActionBar(Component.text("Wait for game to start!", NamedTextColor.YELLOW));

@@ -10,28 +10,28 @@ public class GameConfig {
 
     private final int minPlayers;
     private final int maxPlayers;
-    private final long gameDuration; // milliseconds
+    private final long gameDurationMilliSeconds;
     private final int worldSize; // blocks (radius)
     private final int pregameLobbyHeight; // Y level
     private final boolean teamsEnabled;
     private final int teamSize;
     private final int zonePhases;
-    private final int zoneGracePeriod; // seconds
+    private final int zoneGracePeriodSeconds;
     private final boolean deathmatchEnabled;
-    private final int deathmatchTimeLimit; // seconds
+    private final int deathmatchTimeLimitSeconds;
 
     private GameConfig(Builder builder) {
         this.minPlayers = builder.minPlayers;
         this.maxPlayers = builder.maxPlayers;
-        this.gameDuration = builder.gameDuration;
+        this.gameDurationMilliSeconds = builder.gameDuration;
         this.worldSize = builder.worldSize;
         this.pregameLobbyHeight = builder.pregameLobbyHeight;
         this.teamsEnabled = builder.teamsEnabled;
         this.teamSize = builder.teamSize;
         this.zonePhases = builder.zonePhases;
-        this.zoneGracePeriod = builder.zoneGracePeriod;
+        this.zoneGracePeriodSeconds = builder.zoneGracePeriod;
         this.deathmatchEnabled = builder.deathmatchEnabled;
-        this.deathmatchTimeLimit = builder.deathmatchTimeLimit;
+        this.deathmatchTimeLimitSeconds = builder.deathmatchTimeLimit;
     }
 
     /**
@@ -65,7 +65,7 @@ public class GameConfig {
     }
 
     public long getGameDuration() {
-        return gameDuration;
+        return gameDurationMilliSeconds;
     }
 
     public int getWorldSize() {
@@ -89,7 +89,7 @@ public class GameConfig {
     }
 
     public int getZoneGracePeriod() {
-        return zoneGracePeriod;
+        return zoneGracePeriodSeconds;
     }
 
     public boolean isDeathmatchEnabled() {
@@ -97,7 +97,7 @@ public class GameConfig {
     }
 
     public int getDeathmatchTimeLimit() {
-        return deathmatchTimeLimit;
+        return deathmatchTimeLimitSeconds;
     }
 
     // ===== BUILDER =====

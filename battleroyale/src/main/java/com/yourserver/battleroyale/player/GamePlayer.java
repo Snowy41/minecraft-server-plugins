@@ -16,11 +16,9 @@ public class GamePlayer {
     private final String name;
     private final Instant joinedAt;
 
-    // Player state
     private PlayerState state;
     private boolean alive;
 
-    // In-game statistics
     private int kills;
     private int assists;
     private double damageDealt;
@@ -29,7 +27,6 @@ public class GamePlayer {
     private int placement; // 1st, 2nd, 3rd, etc.
 
     // TODO: Team support
-    // private Team team;
 
     public GamePlayer(@NotNull UUID uuid, @NotNull String name) {
         this.uuid = Objects.requireNonNull(uuid);
@@ -129,9 +126,6 @@ public class GamePlayer {
         return placement;
     }
 
-    /**
-     * Gets kill/death/assist summary for display.
-     */
     @NotNull
     public String getKDAString() {
         return kills + "/" + (alive ? 0 : 1) + "/" + assists;

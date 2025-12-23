@@ -49,18 +49,15 @@ public class GameListener implements Listener {
             return;
         }
 
-        // Prevent damage in WAITING and STARTING states
         if (game.getState() == GameState.WAITING || game.getState() == GameState.STARTING) {
             event.setCancelled(true);
             return;
         }
 
-        // Track damage if attacker is player
         if (event.getDamager() instanceof Player attacker) {
             double damage = event.getFinalDamage();
             combatManager.recordDamage(victim.getUniqueId(), attacker.getUniqueId(), damage);
 
-            // Update player damage stats
             GamePlayer victimPlayer = game.getPlayer(victim.getUniqueId());
             GamePlayer attackerPlayer = game.getPlayer(attacker.getUniqueId());
 
@@ -86,21 +83,17 @@ public class GameListener implements Listener {
             return;
         }
 
-        // Don't drop items in battle royale
         event.getDrops().clear();
         event.setKeepInventory(false);
 
-        // Get killer and assisters
         UUID killerUuid = combatManager.getKiller(player.getUniqueId());
         UUID[] assisters = combatManager.getAssisters(player.getUniqueId(), killerUuid);
 
-        // Update kill stats
         if (killerUuid != null) {
             GamePlayer killerPlayer = game.getPlayer(killerUuid);
             if (killerPlayer != null) {
                 killerPlayer.addKill();
 
-                // Notify killer
                 Player killer = plugin.getServer().getPlayer(killerUuid);
                 if (killer != null) {
                     killer.sendMessage(Component.text("☠ ", NamedTextColor.RED)
@@ -111,13 +104,11 @@ public class GameListener implements Listener {
             }
         }
 
-        // Update assist stats
         for (UUID assisterUuid : assisters) {
             GamePlayer assisterPlayer = game.getPlayer(assisterUuid);
             if (assisterPlayer != null) {
                 assisterPlayer.addAssist();
 
-                // Notify assister
                 Player assister = plugin.getServer().getPlayer(assisterUuid);
                 if (assister != null) {
                     assister.sendMessage(Component.text("+ ", NamedTextColor.YELLOW)
@@ -127,7 +118,6 @@ public class GameListener implements Listener {
             }
         }
 
-        // Custom death message
         Component deathMessage;
         if (killerUuid != null) {
             Player killer = plugin.getServer().getPlayer(killerUuid);
@@ -143,17 +133,14 @@ public class GameListener implements Listener {
                     .append(Component.text(" ☠", NamedTextColor.RED));
         }
 
-        // Broadcast to game
         for (Player p : game.getOnlinePlayers()) {
             p.sendMessage(deathMessage);
         }
 
-        event.deathMessage(null); // Suppress default message
+        event.deathMessage(null);
 
-        // Mark player as eliminated
         game.eliminatePlayer(player.getUniqueId());
 
-        // Clear combat data
         combatManager.clearPlayer(player.getUniqueId());
 
         // TODO: Convert to spectator
@@ -172,13 +159,11 @@ public class GameListener implements Listener {
             return;
         }
 
-        // Only restrict movement during WAITING and STARTING
         if (game.getState() != GameState.WAITING && game.getState() != GameState.STARTING) {
             return;
         }
 
         // TODO: Check if player is trying to leave pre-game lobby bounds
-        // If so, teleport them back
     }
 
     /**

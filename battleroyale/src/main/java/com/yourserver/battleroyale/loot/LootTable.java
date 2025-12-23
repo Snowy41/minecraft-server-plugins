@@ -28,7 +28,6 @@ public class LootTable {
      * Initializes default loot for all tiers.
      */
     private void initializeDefaultLoot() {
-        // COMMON LOOT
         addLoot(LootTier.COMMON, Material.WOODEN_SWORD, 1, 1);
         addLoot(LootTier.COMMON, Material.WOODEN_AXE, 1, 1);
         addLoot(LootTier.COMMON, Material.LEATHER_HELMET, 1, 1);
@@ -39,7 +38,6 @@ public class LootTable {
         addLoot(LootTier.COMMON, Material.ARROW, 8, 16);
         addLoot(LootTier.COMMON, Material.BOW, 1, 1);
 
-        // UNCOMMON LOOT
         addLoot(LootTier.UNCOMMON, Material.STONE_SWORD, 1, 1);
         addLoot(LootTier.UNCOMMON, Material.STONE_AXE, 1, 1);
         addLoot(LootTier.UNCOMMON, Material.CHAINMAIL_HELMET, 1, 1);
@@ -50,7 +48,6 @@ public class LootTable {
         addLoot(LootTier.UNCOMMON, Material.ARROW, 16, 32);
         addLoot(LootTier.UNCOMMON, Material.CROSSBOW, 1, 1);
 
-        // RARE LOOT
         addLoot(LootTier.RARE, Material.IRON_SWORD, 1, 1);
         addLoot(LootTier.RARE, Material.IRON_AXE, 1, 1);
         addLoot(LootTier.RARE, Material.IRON_HELMET, 1, 1);
@@ -61,7 +58,6 @@ public class LootTable {
         addLoot(LootTier.RARE, Material.SHIELD, 1, 1);
         addLoot(LootTier.RARE, Material.ENDER_PEARL, 1, 3);
 
-        // EPIC LOOT
         addLoot(LootTier.EPIC, Material.DIAMOND_SWORD, 1, 1);
         addLoot(LootTier.EPIC, Material.DIAMOND_AXE, 1, 1);
         addLoot(LootTier.EPIC, Material.DIAMOND_HELMET, 1, 1);
@@ -71,7 +67,6 @@ public class LootTable {
         addLoot(LootTier.EPIC, Material.ENCHANTED_GOLDEN_APPLE, 1, 1);
         addLoot(LootTier.EPIC, Material.TOTEM_OF_UNDYING, 1, 1);
 
-        // LEGENDARY LOOT
         addLoot(LootTier.LEGENDARY, Material.NETHERITE_SWORD, 1, 1);
         addLoot(LootTier.LEGENDARY, Material.NETHERITE_AXE, 1, 1);
         addLoot(LootTier.LEGENDARY, Material.NETHERITE_HELMET, 1, 1);
@@ -111,7 +106,6 @@ public class LootTable {
             LootItem item = available.get(random.nextInt(available.size()));
             ItemStack stack = item.create();
 
-            // Apply tier-specific enchantments
             applyEnchantments(stack, tier);
 
             loot.add(stack);
@@ -168,7 +162,6 @@ public class LootTable {
             return;
         }
 
-        // Apply appropriate enchantments
         if (isSword(type)) {
             meta.addEnchant(Enchantment.SHARPNESS, enchantLevel, true);
             if (tier.ordinal() >= LootTier.RARE.ordinal()) {

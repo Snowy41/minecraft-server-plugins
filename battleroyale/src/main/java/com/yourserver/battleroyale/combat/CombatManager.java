@@ -1,22 +1,14 @@
 package com.yourserver.battleroyale.combat;
 
-import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Manages combat tracking for kills, assists, and damage.
- *
- * Features:
- * - Tracks last damage dealer for kill attribution
- * - Tracks assists (players who damaged within 10 seconds)
- * - Tracks total damage dealt and taken
- * - Combat log for preventing logout during combat
  */
 public class CombatManager {
 
@@ -50,14 +42,11 @@ public class CombatManager {
     public void recordDamage(@NotNull UUID victim, @NotNull UUID attacker, double damage) {
         long now = System.currentTimeMillis();
 
-        // Update last damage dealer
         lastDamage.put(victim, new DamageRecord(attacker, now, damage));
 
-        // Track for assists
         assists.computeIfAbsent(victim, k -> new ConcurrentHashMap<>())
                 .put(attacker, now);
 
-        // Update damage statistics
         damageDealt.merge(attacker, damage, Double::sum);
         damageTaken.merge(victim, damage, Double::sum);
     }
@@ -125,7 +114,6 @@ public class CombatManager {
      * @return true if in combat, false otherwise
      */
     public boolean isInCombat(@NotNull UUID player) {
-        // Check if player recently attacked someone
         boolean recentlyAttacked = assists.values().stream()
                 .anyMatch(attackers -> {
                     Long lastAttack = attackers.get(player);
@@ -137,7 +125,6 @@ public class CombatManager {
                     return timeSince <= COMBAT_TIMEOUT;
                 });
 
-        // Check if player was recently attacked
         DamageRecord record = lastDamage.get(player);
         if (record != null) {
             long timeSince = System.currentTimeMillis() - record.timestamp;
@@ -172,7 +159,6 @@ public class CombatManager {
         damageDealt.remove(player);
         damageTaken.remove(player);
 
-        // Remove from other players' assist lists
         assists.values().forEach(map -> map.remove(player));
     }
 

@@ -55,29 +55,24 @@ public class BattleRoyaleConfig {
 
             CommentedConfigurationNode root = loader.load();
 
-            // Game settings
             CommentedConfigurationNode game = root.node("game");
             int minPlayers = game.node("min-players").getInt(25);
             int maxPlayers = game.node("max-players").getInt(100);
             int countdownSeconds = game.node("countdown-seconds").getInt(30);
             int pregameLobbyHeight = game.node("pregame-lobby", "height").getInt(320);
 
-            // World settings
             CommentedConfigurationNode world = root.node("world");
             int worldSize = world.node("size").getInt(2000);
 
-            // Zone settings
             CommentedConfigurationNode zone = root.node("zone");
             int zonePhases = zone.node("phases").getInt(8);
             int zoneGracePeriod = zone.node("grace-period").getInt(120);
 
-            // Deathmatch settings
             CommentedConfigurationNode deathmatch = game.node("deathmatch");
             boolean deathmatchEnabled = deathmatch.node("enabled").getBoolean(true);
             int deathmatchTimeLimit = deathmatch.node("time-limit").getInt(3600);
             int deathmatchArenaSize = deathmatch.node("arena-size").getInt(50);
 
-            // Team settings (future)
             boolean teamsEnabled = root.node("teams", "enabled").getBoolean(false);
 
             return new BattleRoyaleConfig(

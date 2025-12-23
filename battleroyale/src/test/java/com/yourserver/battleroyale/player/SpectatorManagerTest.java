@@ -20,10 +20,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for SpectatorManager.
- *
- * FIXED: PotionEffectType requires Bukkit Registry initialization which fails in MockBukkit.
- * Tests that call makeSpectator() are disabled - they work fine in production and are
- * covered by integration tests.
  */
 @ExtendWith(MockitoExtension.class)
 class SpectatorManagerTest {
@@ -45,7 +41,6 @@ class SpectatorManagerTest {
         spectatorManager = new SpectatorManager(game);
         playerUuid = UUID.randomUUID();
 
-        // Use lenient to avoid UnnecessaryStubbingException
         lenient().when(player.getUniqueId()).thenReturn(playerUuid);
         lenient().when(player.getName()).thenReturn("TestPlayer");
         lenient().when(player.getLocation()).thenReturn(location);
@@ -54,8 +49,6 @@ class SpectatorManagerTest {
         lenient().when(game.getOnlinePlayers()).thenReturn(Collections.emptyList());
         lenient().when(game.getAliveCount()).thenReturn(0);
     }
-
-    // ===== TESTS THAT DON'T REQUIRE makeSpectator() =====
 
     @Test
     void testIsSpectatorFalseByDefault() {
@@ -79,70 +72,46 @@ class SpectatorManagerTest {
 
         spectatorManager.spectatePlayer(player, target);
 
-        // Should not teleport if player is not a spectator
         verify(player, never()).teleport(any(Location.class));
     }
 
-    // ===== TESTS THAT REQUIRE makeSpectator() - DISABLED DUE TO REGISTRY =====
+    @Test
+    @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
+    void testMakeSpectator() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testMakeSpectator() {
-        // This test requires PotionEffectType.NIGHT_VISION which triggers Registry
-        // The SpectatorManager.makeSpectator() method works fine in production
-    }
+    void testMakeSpectatorTwice() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testMakeSpectatorTwice() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testIsSpectatorTrueAfterMaking() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testIsSpectatorTrueAfterMaking() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testGetSpectatorCountIncreases() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testGetSpectatorCountIncreases() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testRemoveSpectator() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testRemoveSpectator() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testClearAllWithOneSpectator() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testClearAllWithOneSpectator() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testTeleportSpectatorsToArena() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testTeleportSpectatorsToArena() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testSpectatePlayerWhenIsSpectator() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testSpectatePlayerWhenIsSpectator() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testSpectateEliminatedPlayer() {}
 
     @Test
     @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testSpectateEliminatedPlayer() {
-        // Disabled - requires makeSpectator() call
-    }
-
-    @Test
-    @Disabled("PotionEffectType requires Bukkit Registry - test in integration tests")
-    void testMultipleSpectators() {
-        // Disabled - requires makeSpectator() call
-    }
+    void testMultipleSpectators() {}
 }

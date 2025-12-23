@@ -2,9 +2,6 @@ package com.yourserver.battleroyale.game;
 
 /**
  * Represents the current state of a battle royale game.
- *
- * State transitions:
- * WAITING → STARTING → ACTIVE → DEATHMATCH → ENDING
  */
 public enum GameState {
 

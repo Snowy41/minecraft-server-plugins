@@ -22,10 +22,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for MinimalProtectionListener.
- *
- * FIXED:
- * - Added lenient() to avoid UnnecessaryStubbingException
- * - Changed sendActionBar argument matcher from String to Component
  */
 @ExtendWith(MockitoExtension.class)
 class MinimalProtectionListenerTest {
@@ -62,8 +58,6 @@ class MinimalProtectionListenerTest {
         listener = new MinimalProtectionListener(gameManager);
         playerUuid = UUID.randomUUID();
 
-        // Use lenient() to avoid UnnecessaryStubbingException
-        // These stubs are used by SOME tests, not all
         lenient().when(player.getUniqueId()).thenReturn(playerUuid);
         lenient().when(gameManager.getPlayerGame(player)).thenReturn(game);
     }
@@ -240,7 +234,6 @@ class MinimalProtectionListenerTest {
 
         listener.onBlockBreak(blockBreakEvent);
 
-        // Should not cancel if player not in game
         verify(blockBreakEvent, never()).setCancelled(anyBoolean());
     }
 }

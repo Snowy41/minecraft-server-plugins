@@ -14,19 +14,8 @@ import com.yourserver.battleroyale.listener.MinimalProtectionListener;
 
 import java.util.logging.Level;
 
-/**
+/*
  * BattleRoyale Plugin - Main Class
- *
- * A battle royale game mode supporting 25-100 players.
- *
- * Features:
- * - Pre-game lobby above the map
- * - Random world generation with custom structures
- * - Shrinking zone system
- * - Deathmatch arena after time limit
- * - Solo and team modes
- * - Statistics tracking
- * - Cross-server messaging via Redis
  *
  * Game Flow:
  * 1. WAITING - Players join pre-game lobby

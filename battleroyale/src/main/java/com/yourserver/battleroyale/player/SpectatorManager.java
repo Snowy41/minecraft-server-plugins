@@ -17,12 +17,6 @@ import java.util.UUID;
 
 /**
  * Manages spectator functionality for eliminated players.
- *
- * Features:
- * - Converts dead players to spectators
- * - Allows spectating remaining players
- * - Prevents interference with game
- * - Provides UI for spectator controls
  */
 public class SpectatorManager {
 
@@ -42,20 +36,16 @@ public class SpectatorManager {
     public void makeSpectator(@NotNull Player player) {
         UUID uuid = player.getUniqueId();
 
-        // Already a spectator?
         if (spectators.containsKey(uuid)) {
             return;
         }
 
-        // Set spectator mode
         player.setGameMode(GameMode.SPECTATOR);
 
-        // Clear effects
         player.getActivePotionEffects().forEach(effect ->
                 player.removePotionEffect(effect.getType())
         );
 
-        // Add night vision for better viewing
         player.addPotionEffect(new PotionEffect(
                 PotionEffectType.NIGHT_VISION,
                 Integer.MAX_VALUE,
@@ -65,22 +55,18 @@ public class SpectatorManager {
                 false
         ));
 
-        // Set flight
         player.setAllowFlight(true);
         player.setFlying(true);
 
-        // Find a good spectate target
         Player target = findSpectateTarget();
         if (target != null) {
             player.teleport(target.getLocation());
             player.setSpectatorTarget(target);
         }
 
-        // Create spectator data
         SpectatorData data = new SpectatorData(uuid, player.getName());
         spectators.put(uuid, data);
 
-        // Send spectator UI
         sendSpectatorUI(player);
     }
 
@@ -100,9 +86,6 @@ public class SpectatorManager {
                 .orElse(null);
     }
 
-    /**
-     * Sends spectator UI/instructions to player.
-     */
     private void sendSpectatorUI(@NotNull Player player) {
         player.sendMessage(Component.empty());
         player.sendMessage(Component.text("━━━━━━━━━━━━━━━━━━━━━━━━━━", NamedTextColor.DARK_GRAY));
@@ -132,33 +115,22 @@ public class SpectatorManager {
         UUID uuid = player.getUniqueId();
         spectators.remove(uuid);
 
-        // Clear spectator effects
         player.removePotionEffect(PotionEffectType.NIGHT_VISION);
         player.setSpectatorTarget(null);
 
-        // Reset to survival (will be changed by game state)
         player.setGameMode(GameMode.SURVIVAL);
         player.setFlying(false);
         player.setAllowFlight(false);
     }
 
-    /**
-     * Checks if a player is a spectator.
-     */
     public boolean isSpectator(@NotNull UUID uuid) {
         return spectators.containsKey(uuid);
     }
 
-    /**
-     * Gets the number of spectators.
-     */
     public int getSpectatorCount() {
         return spectators.size();
     }
 
-    /**
-     * Teleports a spectator to a specific player.
-     */
     public void spectatePlayer(@NotNull Player spectator, @NotNull Player target) {
         if (!isSpectator(spectator.getUniqueId())) {
             return;
@@ -176,9 +148,6 @@ public class SpectatorManager {
                 .append(Component.text(target.getName(), NamedTextColor.YELLOW)));
     }
 
-    /**
-     * Teleports all spectators to the deathmatch arena.
-     */
     public void teleportSpectatorsToArena(@NotNull Location arenaCenter) {
         for (UUID uuid : spectators.keySet()) {
             Player spectator = org.bukkit.Bukkit.getPlayer(uuid);
@@ -192,9 +161,6 @@ public class SpectatorManager {
         }
     }
 
-    /**
-     * Clears all spectators.
-     */
     public void clearAll() {
         // Remove spectator effects from all
         for (UUID uuid : spectators.keySet()) {

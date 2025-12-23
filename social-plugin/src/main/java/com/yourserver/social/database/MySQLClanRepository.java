@@ -1,9 +1,9 @@
 package com.yourserver.social.database;
 
 import com.yourserver.social.model.Clan;
-import com.zaxxer.hikari.HikariDataSource;
 import org.jetbrains.annotations.NotNull;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
@@ -14,15 +14,15 @@ import java.util.logging.Logger;
 
 /**
  * MySQL implementation of clan storage.
- * Uses CorePlugin's HikariCP connection pool.
+ * Uses CorePlugin's connection pool via DataSource.
  */
 public class MySQLClanRepository {
 
-    private final HikariDataSource dataSource;
+    private final DataSource dataSource;
     private final Executor executor;
     private final Logger logger;
 
-    public MySQLClanRepository(@NotNull HikariDataSource dataSource,
+    public MySQLClanRepository(@NotNull DataSource dataSource,
                                @NotNull Executor executor,
                                @NotNull Logger logger) {
         this.dataSource = dataSource;

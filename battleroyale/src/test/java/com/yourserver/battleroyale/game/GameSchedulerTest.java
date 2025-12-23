@@ -11,8 +11,6 @@ import static org.mockito.Mockito.*;
 
 /**
  * Unit tests for GameScheduler.
- *
- * NOW WORKING: GameScheduler refactored to accept Plugin + Config separately!
  */
 class GameSchedulerTest {
 
@@ -36,16 +34,13 @@ class GameSchedulerTest {
     void setUp() {
         game = mock(Game.class);
 
-        // Load simple test plugin
         testPlugin = MockBukkit.load(TestPlugin.class);
 
-        // Create mock config
         config = mock(BattleRoyaleConfig.class);
         when(config.getCountdownSeconds()).thenReturn(30);
         when(config.getMinPlayers()).thenReturn(25);
         when(config.getMaxPlayers()).thenReturn(100);
 
-        // Create GameScheduler with new test-friendly constructor
         gameScheduler = new GameScheduler(testPlugin, config, game);
     }
 
@@ -132,7 +127,7 @@ class GameSchedulerTest {
     @Test
     void testOnStateChangeToEnding() {
         when(game.getId()).thenReturn("test-game");
-        when(game.getState()).thenReturn(GameState.ACTIVE); // Need state before start()
+        when(game.getState()).thenReturn(GameState.ACTIVE);
 
         gameScheduler.start();
         gameScheduler.onStateChange(GameState.ENDING);
@@ -176,25 +171,20 @@ class GameSchedulerTest {
     void testStateTransitionSequence() {
         when(game.getId()).thenReturn("test-game");
 
-        // WAITING
         when(game.getState()).thenReturn(GameState.WAITING);
         gameScheduler.onStateChange(GameState.WAITING);
         assertFalse(gameScheduler.isRunning());
 
-        // STARTING
         when(game.getState()).thenReturn(GameState.STARTING);
         gameScheduler.start();
         gameScheduler.onStateChange(GameState.STARTING);
 
-        // ACTIVE
         when(game.getState()).thenReturn(GameState.ACTIVE);
         gameScheduler.onStateChange(GameState.ACTIVE);
 
-        // DEATHMATCH
         when(game.getState()).thenReturn(GameState.DEATHMATCH);
         gameScheduler.onStateChange(GameState.DEATHMATCH);
 
-        // ENDING
         when(game.getState()).thenReturn(GameState.ENDING);
         gameScheduler.onStateChange(GameState.ENDING);
         assertFalse(gameScheduler.isRunning());

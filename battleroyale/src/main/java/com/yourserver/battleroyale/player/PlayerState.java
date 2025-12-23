@@ -25,23 +25,14 @@ public enum PlayerState {
      */
     DISCONNECTED;
 
-    /**
-     * Checks if the player can take damage.
-     */
     public boolean canTakeDamage() {
         return this == PLAYING;
     }
 
-    /**
-     * Checks if the player can deal damage.
-     */
+
     public boolean canDealDamage() {
         return this == PLAYING;
     }
-
-    /**
-     * Checks if the player is in a playable state.
-     */
     public boolean isPlayable() {
         return this == PLAYING;
     }

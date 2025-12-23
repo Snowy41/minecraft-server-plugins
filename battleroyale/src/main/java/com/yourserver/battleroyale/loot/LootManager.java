@@ -71,11 +71,9 @@ public class LootManager {
         Inventory inv = chest.getInventory();
         inv.clear();
 
-        // Generate 3-8 random items
         int itemCount = 3 + random.nextInt(6);
         List<ItemStack> loot = lootTable.generateMixedLoot(itemCount);
 
-        // Place items in random slots
         List<Integer> slots = new ArrayList<>();
         for (int i = 0; i < 27; i++) {
             slots.add(i);

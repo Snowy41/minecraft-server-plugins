@@ -83,7 +83,6 @@ public class Arena {
     @NotNull
     public List<Location> getSpawnPoints(int count) {
         if (spawnPoints.isEmpty()) {
-            // Generate circular spawns around center
             return generateCircularSpawns(count);
         }
 

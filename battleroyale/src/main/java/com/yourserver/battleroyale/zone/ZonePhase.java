@@ -4,16 +4,15 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Represents a phase of zone shrinking with configuration.
- * Each phase defines timing, radius, and damage parameters.
  */
 public class ZonePhase {
 
     private final int id;
-    private final int waitDuration;      // seconds to wait before shrinking
-    private final int shrinkDuration;    // seconds for the shrink to complete
-    private final double targetRadius;   // final radius after shrink
-    private final double damagePerTick;  // damage dealt outside zone per tick
-    private final int tickInterval;      // ticks between damage applications
+    private final int waitDuration;
+    private final int shrinkDuration;
+    private final double targetRadius;
+    private final double damagePerTick;
+    private final int tickInterval;
 
     public ZonePhase(int id, int waitDuration, int shrinkDuration,
                      double targetRadius, double damagePerTick, int tickInterval) {
@@ -32,11 +31,11 @@ public class ZonePhase {
     public static ZonePhase createDefault(int id) {
         return new ZonePhase(
                 id,
-                180,  // 3 minutes wait
-                60,   // 1 minute shrink
-                500,  // 500 block radius
-                1.0,  // 1 HP per tick
-                20    // Every second (20 ticks)
+                180,
+                60,
+                500,
+                1.0,
+                20
         );
     }
 

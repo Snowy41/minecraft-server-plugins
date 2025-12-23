@@ -15,9 +15,6 @@ import java.util.logging.Level;
 
 /**
  * Game Scheduler - The "heartbeat" of the Battle Royale game.
- *
- * REFACTORED: Now accepts Plugin + BattleRoyaleConfig separately,
- * making it testable without BattleRoyalePlugin dependency.
  */
 public class GameScheduler {
 
@@ -25,15 +22,12 @@ public class GameScheduler {
     private final BattleRoyaleConfig config;
     private final Game game;
 
-    // Scheduler tasks
     private BukkitTask countdownTask;
     private BukkitTask gameTickTask;
     private BukkitTask winCheckTask;
 
-    // Countdown state
     private int countdownSeconds;
 
-    // Running state
     private boolean running = false;
 
     /**

@@ -5,14 +5,13 @@ api-version: '1.21'
 author: MCBZH
 description: Core infrastructure plugin providing database, Redis, and player data management
 
-# Load before other plugins
 load: STARTUP
 depend:
   - APIModule
 loadbefore:
   - LobbyPlugin
   - BattleRoyalePlugin
-# Soft dependencies (plugins that can optionally be present)
+
 softdepend:
   - LuckPerms
 

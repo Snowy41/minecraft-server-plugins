@@ -120,22 +120,45 @@ public class FriendCommand implements CommandExecutor, TabCompleter {
         }
 
         String targetName = args[1];
-        OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(targetName);
 
-        if (!offlineTarget.hasPlayedBefore()) {
-            sendMessage(player, "player-not-found");
-            return;
-        }
+        // First try to find by exact username in friends list
+        friendManager.getFriends(player.getUniqueId()).thenAccept(friends -> {
+            Friend matchingFriend = friends.stream()
+                    .filter(f -> f.getFriendName().equalsIgnoreCase(targetName))
+                    .findFirst()
+                    .orElse(null);
 
-        UUID targetUuid = offlineTarget.getUniqueId();
-
-        friendManager.removeFriend(player, targetUuid).thenAccept(success -> {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                if (success) {
-                    sendMessage(player, "friend-removed", offlineTarget.getName());
+                if (matchingFriend != null) {
+                    // Found in friends list, remove by UUID
+                    friendManager.removeFriend(player, matchingFriend.getFriendUuid()).thenAccept(success -> {
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (success) {
+                                sendMessage(player, "friend-removed", matchingFriend.getFriendName());
+                            } else {
+                                player.sendMessage(Component.text(
+                                        matchingFriend.getFriendName() + " is not your friend!", NamedTextColor.RED));
+                            }
+                        });
+                    });
                 } else {
-                    player.sendMessage(Component.text(
-                            offlineTarget.getName() + " is not your friend!", NamedTextColor.RED));
+                    // Not in friends list, try as offline player
+                    OfflinePlayer offlineTarget = Bukkit.getOfflinePlayer(targetName);
+                    if (!offlineTarget.hasPlayedBefore()) {
+                        sendMessage(player, "player-not-found");
+                        return;
+                    }
+
+                    friendManager.removeFriend(player, offlineTarget.getUniqueId()).thenAccept(success -> {
+                        Bukkit.getScheduler().runTask(plugin, () -> {
+                            if (success) {
+                                sendMessage(player, "friend-removed", offlineTarget.getName());
+                            } else {
+                                player.sendMessage(Component.text(
+                                        offlineTarget.getName() + " is not your friend!", NamedTextColor.RED));
+                            }
+                        });
+                    });
                 }
             });
         });
@@ -148,23 +171,32 @@ public class FriendCommand implements CommandExecutor, TabCompleter {
         }
 
         String senderName = args[1];
-        OfflinePlayer offlineSender = Bukkit.getOfflinePlayer(senderName);
 
-        if (!offlineSender.hasPlayedBefore()) {
-            sendMessage(player, "player-not-found");
-            return;
-        }
+        // Get all pending requests and find the one from this sender
+        friendManager.getPendingRequests(player.getUniqueId()).thenAccept(requests -> {
+            FriendRequest matchingRequest = requests.stream()
+                    .filter(req -> req.getFromName().equalsIgnoreCase(senderName))
+                    .findFirst()
+                    .orElse(null);
 
-        UUID senderUuid = offlineSender.getUniqueId();
-
-        friendManager.acceptFriendRequest(player, senderUuid).thenAccept(result -> {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                switch (result) {
-                    case SUCCESS -> sendMessage(player, "friend-added", offlineSender.getName());
-                    case REQUEST_NOT_FOUND -> sendMessage(player, "no-pending-requests");
-                    case REQUEST_EXPIRED -> sendMessage(player, "friend-request-expired");
-                    default -> player.sendMessage(Component.text("An error occurred!", NamedTextColor.RED));
+                if (matchingRequest == null) {
+                    player.sendMessage(Component.text(
+                            "No friend request from " + senderName + "!", NamedTextColor.RED));
+                    return;
                 }
+
+                // Accept the request using the UUID
+                friendManager.acceptFriendRequest(player, matchingRequest.getFromUuid()).thenAccept(result -> {
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        switch (result) {
+                            case SUCCESS -> sendMessage(player, "friend-added", matchingRequest.getFromName());
+                            case REQUEST_NOT_FOUND -> sendMessage(player, "no-pending-requests");
+                            case REQUEST_EXPIRED -> sendMessage(player, "friend-request-expired");
+                            default -> player.sendMessage(Component.text("An error occurred!", NamedTextColor.RED));
+                        }
+                    });
+                });
             });
         });
     }
@@ -176,18 +208,26 @@ public class FriendCommand implements CommandExecutor, TabCompleter {
         }
 
         String senderName = args[1];
-        OfflinePlayer offlineSender = Bukkit.getOfflinePlayer(senderName);
 
-        if (!offlineSender.hasPlayedBefore()) {
-            sendMessage(player, "player-not-found");
-            return;
-        }
+        // Get all pending requests and find the one from this sender
+        friendManager.getPendingRequests(player.getUniqueId()).thenAccept(requests -> {
+            FriendRequest matchingRequest = requests.stream()
+                    .filter(req -> req.getFromName().equalsIgnoreCase(senderName))
+                    .findFirst()
+                    .orElse(null);
 
-        UUID senderUuid = offlineSender.getUniqueId();
-
-        friendManager.denyFriendRequest(player.getUniqueId(), senderUuid).thenRun(() -> {
             Bukkit.getScheduler().runTask(plugin, () -> {
-                player.sendMessage(Component.text("Friend request denied.", NamedTextColor.GRAY));
+                if (matchingRequest == null) {
+                    player.sendMessage(Component.text(
+                            "No friend request from " + senderName + "!", NamedTextColor.RED));
+                    return;
+                }
+
+                friendManager.denyFriendRequest(player.getUniqueId(), matchingRequest.getFromUuid()).thenRun(() -> {
+                    Bukkit.getScheduler().runTask(plugin, () -> {
+                        player.sendMessage(Component.text("Friend request denied.", NamedTextColor.GRAY));
+                    });
+                });
             });
         });
     }

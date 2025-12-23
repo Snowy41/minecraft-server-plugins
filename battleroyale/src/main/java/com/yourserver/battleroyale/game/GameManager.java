@@ -40,7 +40,7 @@ public class GameManager {
         this.gameCounter = 0;
 
         startGameTickTask();
-        startCleanupTask(); // NEW: Auto-cleanup ended games
+        startCleanupTask();
     }
 
     @NotNull
@@ -166,7 +166,6 @@ public class GameManager {
             List<String> toRemove = new ArrayList<>();
 
             for (Game game : games.values()) {
-                // Remove games that have been in ENDING state for more than 15 seconds
                 if (game.getState() == GameState.ENDING) {
                     if (game.getEndedAt() != null) {
                         long secondsSinceEnd = (System.currentTimeMillis() - game.getEndedAt().toEpochMilli()) / 1000;
@@ -179,11 +178,10 @@ public class GameManager {
                     }
                 }
 
-                // Also remove empty WAITING games older than 5 minutes
                 if (game.getState() == GameState.WAITING && game.getPlayerCount() == 0) {
                     long secondsSinceCreated = (System.currentTimeMillis() - game.getCreatedAt().toEpochMilli()) / 1000;
 
-                    if (secondsSinceCreated >= 300) { // 5 minutes
+                    if (secondsSinceCreated >= 300) {
                         plugin.getLogger().info("Auto-removing empty game: " + game.getId() +
                                 " (empty for " + secondsSinceCreated + "s)");
                         toRemove.add(game.getId());
@@ -191,12 +189,11 @@ public class GameManager {
                 }
             }
 
-            // Remove all marked games
             for (String gameId : toRemove) {
                 deleteGame(gameId);
             }
 
-        }, 20L * 5, 20L * 5); // Check every 5 seconds
+        }, 20L * 5, 20L * 5);
     }
 
     public void shutdown() {

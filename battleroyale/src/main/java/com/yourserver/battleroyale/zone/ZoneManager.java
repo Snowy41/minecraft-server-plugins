@@ -56,13 +56,10 @@ public class ZoneManager {
         this.phaseStartTime = System.currentTimeMillis();
         this.active = true;
 
-        // Start zone tick (updates shrink progress)
         startZoneTick();
 
-        // Start damage tick (damages players outside zone)
         startDamageTick();
 
-        // Start particle effects
         startParticleEffects();
 
         plugin.getLogger().info("Zone system started for game " + game.getId());
@@ -89,7 +86,6 @@ public class ZoneManager {
             particleTask = null;
         }
 
-        // Remove all boss bars
         for (BossBar bossBar : playerBossBars.values()) {
             for (Player player : game.getOnlinePlayers()) {
                 player.hideBossBar(bossBar);
@@ -112,11 +108,9 @@ public class ZoneManager {
         currentPhaseIndex++;
         ZonePhase nextPhase = phases.get(currentPhaseIndex);
 
-        // Start shrinking to new radius
         currentZone.startShrink(nextPhase.getTargetRadius(), nextPhase.getShrinkDuration());
         phaseStartTime = System.currentTimeMillis();
 
-        // Notify players
         notifyPhaseChange(nextPhase);
 
         plugin.getLogger().info("Zone advanced to phase " + (currentPhaseIndex + 1) +
@@ -132,13 +126,10 @@ public class ZoneManager {
                 return;
             }
 
-            // Update zone shrinking
             currentZone.tick();
 
-            // Update boss bars
             updateBossBars();
 
-            // Check if should advance to next phase
             checkPhaseAdvancement();
 
         }, 1L, 1L); // Every tick
@@ -159,17 +150,14 @@ public class ZoneManager {
             ZonePhase phase = phases.get(currentPhaseIndex);
             double damage = phase.getDamagePerTick();
 
-            // Damage all players outside the zone
             for (Player player : game.getOnlinePlayers()) {
                 if (!game.isPlayerAlive(player.getUniqueId())) {
                     continue;
                 }
 
                 if (!currentZone.isInZone(player.getLocation())) {
-                    // Apply damage
                     player.damage(damage);
 
-                    // Show damage indicator
                     player.sendActionBar(Component.text("☠ Outside Zone! -" +
                             String.format("%.1f", damage) + " HP", NamedTextColor.RED));
                 }
@@ -189,7 +177,7 @@ public class ZoneManager {
 
             showZoneBorder();
 
-        }, 0L, 20L); // Every second
+        }, 0L, 20L);
     }
 
     /**
@@ -198,7 +186,7 @@ public class ZoneManager {
     private void showZoneBorder() {
         Location center = currentZone.getCenter();
         double radius = currentZone.getCurrentRadius();
-        int points = Math.min(100, (int) (radius * 2)); // More points for larger zones
+        int points = Math.min(100, (int) (radius * 2));
 
         for (int i = 0; i < points; i++) {
             double angle = 2 * Math.PI * i / points;
@@ -207,7 +195,6 @@ public class ZoneManager {
 
             Location particleLoc = new Location(center.getWorld(), x, center.getY() + 50, z);
 
-            // Show red dust particles to visualize zone border
             center.getWorld().spawnParticle(
                     Particle.DUST,
                     particleLoc,
@@ -237,7 +224,6 @@ public class ZoneManager {
                 return bar;
             });
 
-            // Update boss bar
             if (currentZone.isShrinking()) {
                 long remaining = currentZone.getRemainingSeconds();
                 float progress = (float) currentZone.getShrinkProgress();
@@ -247,7 +233,6 @@ public class ZoneManager {
                 bossBar.progress(1.0f - progress);
                 bossBar.color(BossBar.Color.RED);
             } else {
-                // Waiting for next phase
                 long elapsed = (System.currentTimeMillis() - phaseStartTime) / 1000;
                 long remaining = currentPhase.getWaitDuration() - elapsed;
 
@@ -268,7 +253,7 @@ public class ZoneManager {
         ZonePhase currentPhase = phases.get(currentPhaseIndex);
 
         if (currentZone.isShrinking()) {
-            return; // Still shrinking
+            return;
         }
 
         long elapsed = (System.currentTimeMillis() - phaseStartTime) / 1000;
@@ -304,7 +289,6 @@ public class ZoneManager {
     private List<ZonePhase> createDefaultPhases() {
         List<ZonePhase> phases = new ArrayList<>();
 
-        // Phase 1: 1000 -> 750 blocks
         phases.add(new ZonePhase.Builder()
                 .id(1)
                 .waitDuration(120)  // 2 min wait
@@ -314,7 +298,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 2: 750 -> 500 blocks
         phases.add(new ZonePhase.Builder()
                 .id(2)
                 .waitDuration(120)
@@ -324,7 +307,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 3: 500 -> 300 blocks
         phases.add(new ZonePhase.Builder()
                 .id(3)
                 .waitDuration(90)
@@ -334,7 +316,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 4: 300 -> 150 blocks
         phases.add(new ZonePhase.Builder()
                 .id(4)
                 .waitDuration(90)
@@ -344,7 +325,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 5: 150 -> 75 blocks
         phases.add(new ZonePhase.Builder()
                 .id(5)
                 .waitDuration(60)
@@ -354,7 +334,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 6: 75 -> 40 blocks
         phases.add(new ZonePhase.Builder()
                 .id(6)
                 .waitDuration(60)
@@ -364,7 +343,6 @@ public class ZoneManager {
                 .tickInterval(20)
                 .build());
 
-        // Phase 7: 40 -> 20 blocks (FINAL)
         phases.add(new ZonePhase.Builder()
                 .id(7)
                 .waitDuration(45)

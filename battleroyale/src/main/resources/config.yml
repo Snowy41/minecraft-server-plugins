@@ -4,31 +4,31 @@
 # Game Settings
 game:
   # Player limits
-  min-players: 25      # Minimum players to start
-  max-players: 100     # Maximum players per game
+  min-players: 25
+  max-players: 100
 
   # Countdown before game starts
   countdown-seconds: 30
 
   # Pre-game lobby (above the map)
   pregame-lobby:
-    height: 320          # Y level of lobby (above build limit)
-    platforms: 8         # Number of spawn platforms
+    height: 320
+    platforms: 8
     transparent-floor: true
 
   # Deathmatch settings
   deathmatch:
     enabled: true
-    time-limit: 3600     # Force deathmatch after 1 hour (seconds)
-    arena-size: 50       # 50x50 blocks arena
+    time-limit: 3600
+    arena-size: 50
     force-pvp: true
 
 # World Generation
 world:
-  size: 2000             # 2000x2000 blocks (radius from center)
+  size: 2000
   border-type: WORLD_BORDER
   generation:
-    seed: random         # "random" or specific seed number
+    seed: random
     custom-structures: true
     structures:
       - pregame_lobby
@@ -37,11 +37,11 @@ world:
 
 # Zone System
 zone:
-  grace-period: 120      # 2 minutes before first shrink (seconds)
-  phases: 8              # Number of shrinking phases
+  grace-period: 120
+  phases: 8
 
   # Damage outside zone
-  damage-per-tick: 1.0   # HP per tick (increases each phase)
+  damage-per-tick: 1.0
 
   # Visual indicators
   indicator:
@@ -51,20 +51,20 @@ zone:
 # Loot System
 loot:
   chests:
-    spawn-rate: 0.7      # 70% of possible chest locations
-    refill: false        # Don't refill chests during game
+    spawn-rate: 0.7
+    refill: false
 
   supply-drops:
     enabled: true
-    interval: 300        # Every 5 minutes (seconds)
+    interval: 300
     announce: true
 
 # Team System (Future)
 teams:
-  enabled: false         # Solo mode only for now
+  enabled: false
   sizes:
-    - 2  # Duos
-    - 4  # Squads
+    - 2
+    - 4
 
 # Statistics
 statistics:
@@ -81,28 +81,22 @@ statistics:
     - time_survived
     - distance_traveled
 
-# Messages (MiniMessage format)
 messages:
   prefix: "<gradient:#FF4500:#DC143C>[BattleRoyale]</gradient> "
 
-  # Game states
   game-starting: "<yellow>Game starting in <white>{seconds} <yellow>seconds..."
   game-started: "<green>Game started! <white>Good luck!"
   game-ending: "<gold>Game over! Winner: <white>{winner}"
 
-  # Player actions
   player-eliminated: "<red>{player} <gray>was eliminated! <yellow>{remaining} <gray>players remaining"
   you-eliminated: "<red>You were eliminated! <gray>Place: <yellow>#{placement}"
 
-  # Zone
   zone-shrinking: "<yellow>⚠ Zone shrinking! <white>Move to the safe area!"
   zone-damage: "<red>❤ You are outside the zone! <white>Take damage!"
 
-  # Deathmatch
   deathmatch-starting: "<gold><bold>DEATHMATCH</bold> <white>Teleporting to arena..."
   deathmatch-active: "<red><bold>FIGHT!</bold> <white>No more hiding!"
 
-# Debug
 debug:
   enabled: false
   log-player-actions: false

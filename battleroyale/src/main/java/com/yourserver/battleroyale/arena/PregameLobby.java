@@ -11,15 +11,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Pre-game lobby above the map.
- * Players spawn here and can see the map below before the game starts.
- *
- * Features:
- * - Elevated platform (Y=320) above build limit
- * - Transparent floor (glass/barriers) to see map below
- * - Circular spawn platforms for players
- * - Countdown display
- * - Jump pads to enter game when it starts
+ * Pre-game lobby above the map. Loaded from WorldEdit schematic.
+ * Currently Implements a simple circular platform design. (TODO: CHANGE TO SCHEMATIC LOAD)
  */
 public class PregameLobby {
 

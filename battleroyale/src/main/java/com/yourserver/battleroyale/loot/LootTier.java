@@ -59,7 +59,7 @@ public enum LootTier {
             }
         }
 
-        return COMMON; // Fallback
+        return COMMON;
     }
 
     /**

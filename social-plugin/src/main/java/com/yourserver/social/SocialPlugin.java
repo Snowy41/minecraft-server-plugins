@@ -18,6 +18,7 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.plugin.java.JavaPlugin;
 
 import javax.sql.DataSource;
+import java.lang.reflect.Method;
 import java.util.logging.Level;
 
 /**
@@ -82,17 +83,20 @@ public class SocialPlugin extends JavaPlugin {
             // === PHASE 3: DATABASE ===
             getLogger().info("Initializing MySQL repositories...");
 
-            // Get HikariDataSource from DatabaseManager
-            HikariDataSource hikariDataSource = corePlugin.getDatabaseManager().getDataSource();
+            // Get DataSource from DatabaseManager using reflection for compatibility
+            DataSource dataSource = getDataSourceFromCore(corePlugin);
+            if (dataSource == null) {
+                throw new IllegalStateException("Failed to get DataSource from CorePlugin!");
+            }
 
             MySQLFriendRepository friendRepo = new MySQLFriendRepository(
-                    hikariDataSource,
+                    dataSource,
                     corePlugin.getAsyncExecutor(),
                     getLogger()
             );
 
             MySQLClanRepository clanRepo = new MySQLClanRepository(
-                    hikariDataSource,
+                    dataSource,
                     corePlugin.getAsyncExecutor(),
                     getLogger()
             );
@@ -194,6 +198,113 @@ public class SocialPlugin extends JavaPlugin {
         getLogger().info("╔════════════════════════════════════════╗");
         getLogger().info("║  ✓ SocialPlugin disabled successfully  ║");
         getLogger().info("╚════════════════════════════════════════╝");
+    }
+
+    /**
+     * Gets DataSource from CorePlugin using reflection for compatibility.
+     * Tries multiple methods to ensure compatibility across versions.
+     */
+    private DataSource getDataSourceFromCore(CorePlugin corePlugin) {
+        try {
+            // Try method 1: DatabaseManager.getDataSource()
+            try {
+                Method getDataSourceMethod = corePlugin.getDatabaseManager().getClass()
+                        .getMethod("getDataSource");
+                Object result = getDataSourceMethod.invoke(corePlugin.getDatabaseManager());
+                if (result instanceof DataSource) {
+                    getLogger().info("✓ Got DataSource via getDataSource() method");
+                    return (DataSource) result;
+                }
+            } catch (NoSuchMethodException e) {
+                getLogger().info("getDataSource() method not found, trying alternative...");
+            }
+
+            // Try method 2: Direct HikariDataSource field access via reflection
+            try {
+                java.lang.reflect.Field dataSourceField = corePlugin.getDatabaseManager().getClass()
+                        .getDeclaredField("dataSource");
+                dataSourceField.setAccessible(true);
+                Object result = dataSourceField.get(corePlugin.getDatabaseManager());
+                if (result instanceof DataSource) {
+                    getLogger().info("✓ Got DataSource via field reflection");
+                    return (DataSource) result;
+                }
+            } catch (NoSuchFieldException e) {
+                getLogger().warning("dataSource field not found");
+            }
+
+            // Try method 3: Get connection and extract DataSource (last resort)
+            try {
+                Method getConnectionMethod = corePlugin.getDatabaseManager().getClass()
+                        .getMethod("getConnection");
+                java.sql.Connection conn = (java.sql.Connection) getConnectionMethod.invoke(
+                        corePlugin.getDatabaseManager());
+                if (conn != null) {
+                    // Get the DataSource from the connection's parent
+                    DataSource ds = new javax.sql.DataSource() {
+                        @Override
+                        public java.sql.Connection getConnection() throws java.sql.SQLException {
+                            try {
+                                return (java.sql.Connection) getConnectionMethod.invoke(
+                                        corePlugin.getDatabaseManager());
+                            } catch (Exception e) {
+                                throw new java.sql.SQLException("Failed to get connection", e);
+                            }
+                        }
+
+                        @Override
+                        public java.sql.Connection getConnection(String username, String password)
+                                throws java.sql.SQLException {
+                            return getConnection();
+                        }
+
+                        @Override
+                        public java.io.PrintWriter getLogWriter() throws java.sql.SQLException {
+                            return null;
+                        }
+
+                        @Override
+                        public void setLogWriter(java.io.PrintWriter out) throws java.sql.SQLException {
+                        }
+
+                        @Override
+                        public void setLoginTimeout(int seconds) throws java.sql.SQLException {
+                        }
+
+                        @Override
+                        public int getLoginTimeout() throws java.sql.SQLException {
+                            return 0;
+                        }
+
+                        @Override
+                        public java.util.logging.Logger getParentLogger()
+                                throws java.sql.SQLFeatureNotSupportedException {
+                            throw new java.sql.SQLFeatureNotSupportedException();
+                        }
+
+                        @Override
+                        public <T> T unwrap(Class<T> iface) throws java.sql.SQLException {
+                            throw new java.sql.SQLException("Not supported");
+                        }
+
+                        @Override
+                        public boolean isWrapperFor(Class<?> iface) throws java.sql.SQLException {
+                            return false;
+                        }
+                    };
+                    getLogger().info("✓ Created DataSource wrapper via getConnection() method");
+                    conn.close(); // Close the test connection
+                    return ds;
+                }
+            } catch (NoSuchMethodException e) {
+                getLogger().warning("getConnection() method not found");
+            }
+
+        } catch (Exception e) {
+            getLogger().log(Level.SEVERE, "Failed to get DataSource from CorePlugin", e);
+        }
+
+        return null;
     }
 
     /**

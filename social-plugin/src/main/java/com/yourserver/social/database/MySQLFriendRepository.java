@@ -2,9 +2,9 @@ package com.yourserver.social.database;
 
 import com.yourserver.social.model.Friend;
 import com.yourserver.social.model.FriendRequest;
-import com.zaxxer.hikari.HikariDataSource;
 import org.jetbrains.annotations.NotNull;
 
+import javax.sql.DataSource;
 import java.sql.*;
 import java.time.Instant;
 import java.util.*;
@@ -15,15 +15,15 @@ import java.util.logging.Logger;
 
 /**
  * MySQL implementation of friend storage.
- * Uses CorePlugin's HikariCP connection pool.
+ * Uses CorePlugin's connection pool via DataSource.
  */
 public class MySQLFriendRepository {
 
-    private final HikariDataSource dataSource;
+    private final DataSource dataSource;
     private final Executor executor;
     private final Logger logger;
 
-    public MySQLFriendRepository(@NotNull HikariDataSource dataSource,
+    public MySQLFriendRepository(@NotNull DataSource dataSource,
                                  @NotNull Executor executor,
                                  @NotNull Logger logger) {
         this.dataSource = dataSource;
@@ -280,6 +280,17 @@ public class MySQLFriendRepository {
     }
 
     private String getPlayerName(UUID uuid) {
-        return uuid.toString().substring(0, 8);
+        // Try to get online player first
+        org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayer(uuid);
+        if (onlinePlayer != null) {
+            return onlinePlayer.getName();
+        }
+
+        // Fall back to offline player
+        org.bukkit.OfflinePlayer offlinePlayer = org.bukkit.Bukkit.getOfflinePlayer(uuid);
+        String name = offlinePlayer.getName();
+
+        // If name is still null (shouldn't happen), use UUID substring as last resort
+        return name != null ? name : uuid.toString().substring(0, 8);
     }
 }

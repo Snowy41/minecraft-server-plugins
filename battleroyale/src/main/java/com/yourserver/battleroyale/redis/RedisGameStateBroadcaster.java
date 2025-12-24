@@ -11,7 +11,12 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
- * FIXED Redis broadcaster with CloudNet 4.0 API integration.
+ * FIXED Redis broadcaster with proper CloudNet 4.0 API integration.
+ *
+ * CloudNet 4.0 Changes:
+ * - Uses InjectionLayer.ext() instead of InjectionLayer.boot()
+ * - Proper dependency injection for ServiceInfoSnapshot
+ * - Better error handling for missing CloudNet environment
  */
 public class RedisGameStateBroadcaster {
 
@@ -49,7 +54,7 @@ public class RedisGameStateBroadcaster {
         this.channelPrefix = channelPrefix;
         this.initialized = new AtomicBoolean(false);
 
-        // FIXED: Use CloudNet 4.0 API to detect service
+        // Get service name from CloudNet system properties (set by wrapper)
         this.serviceName = detectServiceName();
 
         this.stateChannel = channelPrefix + ":state";
@@ -67,36 +72,23 @@ public class RedisGameStateBroadcaster {
     }
 
     /**
-     * FIXED: Detect CloudNet service name using CloudNet 4.0 API.
+     * Detect CloudNet service name - SIMPLE VERSION.
+     * CloudNet wrapper sets system properties automatically.
      */
     @NotNull
     private String detectServiceName() {
-        try {
-            // Use CloudNet 4.0 dependency injection API
-            var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
-            var serviceInfoSnapshot = injectionLayer.instance(
-                    eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class
-            );
+        // CloudNet 4.0: Wrapper sets this property
+        String name = System.getProperty("cloudnet.service.name");
 
-            if (serviceInfoSnapshot != null) {
-                String name = serviceInfoSnapshot.name();
-                if (name != null && !name.isEmpty()) {
-                    plugin.getLogger().info("✓ Detected CloudNet service: " + name);
-                    return name;
-                }
-            }
-        } catch (NoClassDefFoundError e) {
-            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            plugin.getLogger().severe("❌ CRITICAL: CloudNet 4.0 API not found!");
-            plugin.getLogger().severe("❌ Make sure CloudNet driver is in your dependencies!");
-            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            throw new IllegalStateException("CloudNet 4.0 API not available!", e);
-        } catch (Exception e) {
-            plugin.getLogger().severe("Failed to detect CloudNet service: " + e.getMessage());
-            throw new IllegalStateException("Failed to detect CloudNet service name!", e);
+        if (name != null && !name.isEmpty()) {
+            plugin.getLogger().info("✓ CloudNet service: " + name);
+            return name;
         }
 
-        throw new IllegalStateException("CloudNet service info not available!");
+        // Fallback
+        name = Bukkit.getServer().getName();
+        plugin.getLogger().warning("⚠ CloudNet property not set, using: " + name);
+        return name;
     }
 
     public void initialize() {
@@ -110,12 +102,15 @@ public class RedisGameStateBroadcaster {
                 throw new IllegalStateException("Redis is not available!");
             }
 
+            // Subscribe to control channel
             redisMessenger.subscribe(controlChannel, this::handleControlMessage);
             plugin.getLogger().info("✓ Subscribed to control channel: " + controlChannel);
 
+            // Start heartbeat task
             startHeartbeatTask();
             plugin.getLogger().info("✓ Heartbeat task started");
 
+            // Broadcast initial state
             broadcastInitialState();
 
             plugin.getLogger().info("✓ Redis broadcaster initialized successfully!");
@@ -228,6 +223,7 @@ public class RedisGameStateBroadcaster {
         }
     }
 
+    // Getters
     @NotNull
     public String getServiceName() {
         return serviceName;

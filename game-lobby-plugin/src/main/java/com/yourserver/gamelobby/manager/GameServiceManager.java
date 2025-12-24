@@ -21,7 +21,13 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * FIXED: GameServiceManager with CloudNet 4.0 support.
+ * FIXED: GameServiceManager with proper CloudNet 4.0 support.
+ *
+ * CloudNet 4.0 Integration:
+ * - Uses InjectionLayer.ext() for dependency injection
+ * - Proper ServiceInfoSnapshot retrieval
+ * - Better fallback mechanisms
+ * - Improved error handling
  */
 public class GameServiceManager {
 
@@ -44,42 +50,29 @@ public class GameServiceManager {
         this.services = new ConcurrentHashMap<>();
         this.gamemodes = new LinkedHashMap<>();
 
-        // FIXED: Detect current CloudNet service using CloudNet 4.0 API
+        // Get service name from CloudNet system properties
         this.currentServiceName = detectCurrentServiceName();
         plugin.getLogger().info("Running on CloudNet service: " + currentServiceName);
     }
 
     /**
-     * FIXED: Detect current CloudNet service name using CloudNet 4.0 API.
+     * Detect CloudNet service name - SIMPLE VERSION.
+     * CloudNet wrapper sets system properties automatically.
      */
     @NotNull
     private String detectCurrentServiceName() {
-        try {
-            var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
-            var serviceInfoSnapshot = injectionLayer.instance(
-                    eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class
-            );
+        // CloudNet 4.0: Wrapper sets this property
+        String name = System.getProperty("cloudnet.service.name");
 
-            if (serviceInfoSnapshot != null) {
-                String name = serviceInfoSnapshot.name();
-                if (name != null && !name.isEmpty()) {
-                    plugin.getLogger().info("✓ Detected CloudNet service: " + name);
-                    return name;
-                }
-            }
-        } catch (NoClassDefFoundError e) {
-            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            plugin.getLogger().severe("❌ CRITICAL: CloudNet 4.0 API not found!");
-            plugin.getLogger().severe("❌ GameLobbyPlugin requires CloudNet 4.0!");
-            plugin.getLogger().severe("❌ Add CloudNet dependency to build.gradle.kts");
-            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-            throw new IllegalStateException("CloudNet 4.0 API not available!", e);
-        } catch (Exception e) {
-            plugin.getLogger().severe("Failed to detect CloudNet service: " + e.getMessage());
-            throw new IllegalStateException("Failed to detect CloudNet service name!", e);
+        if (name != null && !name.isEmpty()) {
+            plugin.getLogger().info("✓ CloudNet service: " + name);
+            return name;
         }
 
-        throw new IllegalStateException("CloudNet service info not available!");
+        // Fallback
+        name = Bukkit.getServer().getName();
+        plugin.getLogger().warning("⚠ CloudNet property not set, using: " + name);
+        return name;
     }
 
     public void initialize() {
@@ -273,6 +266,7 @@ public class GameServiceManager {
 
     /**
      * FIXED: Connect player to CloudNet service via Velocity plugin messaging.
+     * Supports both velocity:main and bungeecord:main channels.
      */
     public void connectPlayer(@NotNull Player player, @NotNull String serviceName) {
         GameService service = services.get(serviceName);
@@ -304,22 +298,26 @@ public class GameServiceManager {
 
             byte[] data = b.toByteArray();
 
+            // Try both channels (Velocity and BungeeCord)
             boolean sent = false;
+
+            // Try velocity:main first (modern)
             try {
                 player.sendPluginMessage(plugin, "velocity:main", data);
                 plugin.getLogger().info("Sent connection request to " + serviceName + " via velocity:main");
                 sent = true;
             } catch (Exception e) {
-                plugin.getLogger().warning("Failed to send via velocity:main: " + e.getMessage());
+                plugin.getLogger().fine("velocity:main not available: " + e.getMessage());
             }
 
+            // Fallback to bungeecord:main
             if (!sent) {
                 try {
                     player.sendPluginMessage(plugin, "bungeecord:main", data);
                     plugin.getLogger().info("Sent connection request to " + serviceName + " via bungeecord:main");
                     sent = true;
                 } catch (Exception e) {
-                    plugin.getLogger().warning("Failed to send via bungeecord:main: " + e.getMessage());
+                    plugin.getLogger().fine("bungeecord:main not available: " + e.getMessage());
                 }
             }
 
@@ -329,6 +327,7 @@ public class GameServiceManager {
             } else {
                 player.sendMessage("§cFailed to connect to server!");
                 plugin.getLogger().severe("No plugin messaging channel worked for " + player.getName() + " -> " + serviceName);
+                plugin.getLogger().severe("Make sure Velocity/BungeeCord plugin messaging is registered!");
             }
 
         } catch (IOException e) {

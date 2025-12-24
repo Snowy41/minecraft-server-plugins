@@ -19,6 +19,7 @@
             <option value="$PROJECT_DIR$/partition" />
             <option value="$PROJECT_DIR$/social-plugin" />
             <option value="$PROJECT_DIR$/social-plugin-velocity" />
+            <option value="$PROJECT_DIR$/structure-plugin" />
           </set>
         </option>
       </GradleProjectSettings>

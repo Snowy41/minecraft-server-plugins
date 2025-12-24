@@ -49,6 +49,15 @@ public class BattleRoyalePlugin extends JavaPlugin {
     public void onEnable() {
         getLogger().info("Enabling BattleRoyalePlugin...");
 
+        getLogger().info("━━━━━━━━ CLOUDNET DEBUG ━━━━━━━━");
+        getLogger().info("System Properties:");
+        getLogger().info("  cloudnet.service.name = " + System.getProperty("cloudnet.service.name"));
+        getLogger().info("  cloudnet.service.group = " + System.getProperty("cloudnet.service.group"));
+        getLogger().info("  cloudnet.service.task = " + System.getProperty("cloudnet.service.task"));
+        getLogger().info("Environment Variables:");
+        getLogger().info("  CLOUDNET_SERVICE_NAME = " + System.getenv("CLOUDNET_SERVICE_NAME"));
+        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
         try {
             // 1. Get CorePlugin (required for Redis and player data)
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");

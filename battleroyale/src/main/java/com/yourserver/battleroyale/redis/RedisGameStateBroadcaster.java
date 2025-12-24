@@ -74,44 +74,27 @@ public class RedisGameStateBroadcaster {
         plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
-    /**
-     * FIXED: Proper CloudNet service name detection.
-     */
     @NotNull
     private String detectServiceName() {
-        // Try CloudNet 4.0 system property first
-        String name = System.getProperty("cloudnet.service.name");
+        // Use CloudNet 4.0 API to get service name
+        try {
+            var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
+            var serviceInfoSnapshot = injectionLayer.instance(eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class);
 
-        if (name != null && !name.isEmpty()) {
-            plugin.getLogger().info("✓ Detected CloudNet service: " + name);
-            return name;
+            String name = serviceInfoSnapshot.name();
+            if (name != null && !name.isEmpty()) {
+                plugin.getLogger().info("✓ Detected CloudNet service: " + name);
+                return name;
+            }
+        } catch (NoClassDefFoundError | Exception e) {
+            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            plugin.getLogger().severe("❌ CRITICAL: CloudNet 4.0 API not found!");
+            plugin.getLogger().severe("❌ This plugin REQUIRES CloudNet 4.0 to function!");
+            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            throw new IllegalStateException("CloudNet 4.0 API not available!", e);
         }
 
-        // Try alternative CloudNet properties
-        name = System.getProperty("cloudnet.wrapper.service.name");
-        if (name != null && !name.isEmpty()) {
-            plugin.getLogger().info("✓ Detected CloudNet service (alt): " + name);
-            return name;
-        }
-
-        // Try environment variable
-        name = System.getenv("CLOUDNET_SERVICE_NAME");
-        if (name != null && !name.isEmpty()) {
-            plugin.getLogger().info("✓ Detected CloudNet service (env): " + name);
-            return name;
-        }
-
-        // Fallback to server name
-        String serverName = Bukkit.getServer().getName();
-        if (serverName != null && !serverName.isEmpty() && !serverName.equals("Unknown Server")) {
-            plugin.getLogger().warning("Using server name as fallback: " + serverName);
-            return serverName;
-        }
-
-        // Last resort - use gamemode-1
-        plugin.getLogger().warning("⚠ CloudNet service name not detected! Using fallback.");
-        plugin.getLogger().warning("⚠ Make sure CloudNet is properly configured.");
-        return gamemodeId + "-1";
+        throw new IllegalStateException("Failed to detect CloudNet service name!");
     }
 
     public void initialize() {

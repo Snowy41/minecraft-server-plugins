@@ -2,6 +2,8 @@ package com.yourserver.social.database;
 
 import com.yourserver.social.model.Friend;
 import com.yourserver.social.model.FriendRequest;
+import org.bukkit.Bukkit;
+import org.bukkit.OfflinePlayer;
 import org.jetbrains.annotations.NotNull;
 
 import javax.sql.DataSource;
@@ -14,8 +16,8 @@ import java.util.logging.Level;
 import java.util.logging.Logger;
 
 /**
- * MySQL implementation of friend storage.
- * Uses CorePlugin's connection pool via DataSource.
+ * FIXED: MySQL implementation of friend storage.
+ * Now properly stores and retrieves player names.
  */
 public class MySQLFriendRepository {
 
@@ -50,6 +52,13 @@ public class MySQLFriendRepository {
                         UUID friendUuid = UUID.fromString(rs.getString("friend_uuid"));
                         String friendName = rs.getString("friend_name");
                         Instant since = rs.getTimestamp("since").toInstant();
+
+                        // Update name if stored name is invalid (UUID format or empty)
+                        if (friendName == null || friendName.isEmpty() || isUUID(friendName)) {
+                            friendName = getPlayerNameFromUUID(friendUuid);
+                            // Update database with correct name
+                            updateFriendName(playerUuid, friendUuid, friendName);
+                        }
 
                         friends.add(new Friend(playerUuid, friendUuid, friendName, since));
                     }
@@ -98,22 +107,28 @@ public class MySQLFriendRepository {
                     Instant now = Instant.now();
                     Timestamp timestamp = Timestamp.from(now);
 
+                    // Get actual player names
+                    String player1Name = getPlayerNameFromUUID(player1);
+                    String player2Name = getPlayerNameFromUUID(player2);
+
                     // Add player1 -> player2
                     stmt.setString(1, player1.toString());
                     stmt.setString(2, player2.toString());
-                    stmt.setString(3, getPlayerName(player2));
+                    stmt.setString(3, player2Name);
                     stmt.setTimestamp(4, timestamp);
                     stmt.addBatch();
 
                     // Add player2 -> player1
                     stmt.setString(1, player2.toString());
                     stmt.setString(2, player1.toString());
-                    stmt.setString(3, getPlayerName(player1));
+                    stmt.setString(3, player1Name);
                     stmt.setTimestamp(4, timestamp);
                     stmt.addBatch();
 
                     stmt.executeBatch();
                     conn.commit();
+
+                    logger.info("Added friendship: " + player1Name + " <-> " + player2Name);
 
                 } catch (SQLException e) {
                     conn.rollback();
@@ -141,7 +156,11 @@ public class MySQLFriendRepository {
                 stmt.setString(3, player2.toString());
                 stmt.setString(4, player1.toString());
 
-                stmt.executeUpdate();
+                int deleted = stmt.executeUpdate();
+
+                if (deleted > 0) {
+                    logger.info("Removed friendship between " + player1 + " and " + player2);
+                }
 
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Failed to remove friendship", e);
@@ -172,6 +191,11 @@ public class MySQLFriendRepository {
                         String fromName = rs.getString("from_name");
                         Instant createdAt = rs.getTimestamp("created_at").toInstant();
                         Instant expiresAt = rs.getTimestamp("expires_at").toInstant();
+
+                        // Update name if stored name is invalid
+                        if (fromName == null || fromName.isEmpty() || isUUID(fromName)) {
+                            fromName = getPlayerNameFromUUID(fromUuid);
+                        }
 
                         requests.add(new FriendRequest(id, fromUuid, fromName, playerUuid, createdAt, expiresAt));
                     }
@@ -204,6 +228,11 @@ public class MySQLFriendRepository {
                         Instant createdAt = rs.getTimestamp("created_at").toInstant();
                         Instant expiresAt = rs.getTimestamp("expires_at").toInstant();
 
+                        // Update name if invalid
+                        if (fromName == null || fromName.isEmpty() || isUUID(fromName)) {
+                            fromName = getPlayerNameFromUUID(from);
+                        }
+
                         return Optional.of(new FriendRequest(id, from, fromName, to, createdAt, expiresAt));
                     }
                 }
@@ -220,17 +249,25 @@ public class MySQLFriendRepository {
     public CompletableFuture<Void> createRequest(@NotNull FriendRequest request) {
         return CompletableFuture.runAsync(() -> {
             String sql = "INSERT INTO social_friend_requests (from_uuid, from_name, to_uuid, expires_at) " +
-                    "VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at)";
+                    "VALUES (?, ?, ?, ?) ON DUPLICATE KEY UPDATE expires_at = VALUES(expires_at), from_name = VALUES(from_name)";
 
             try (Connection conn = dataSource.getConnection();
                  PreparedStatement stmt = conn.prepareStatement(sql)) {
 
+                // Ensure we have a valid name
+                String fromName = request.getFromName();
+                if (fromName == null || fromName.isEmpty() || isUUID(fromName)) {
+                    fromName = getPlayerNameFromUUID(request.getFromUuid());
+                }
+
                 stmt.setString(1, request.getFromUuid().toString());
-                stmt.setString(2, request.getFromName());
+                stmt.setString(2, fromName);
                 stmt.setString(3, request.getToUuid().toString());
                 stmt.setTimestamp(4, Timestamp.from(request.getExpiresAt()));
 
                 stmt.executeUpdate();
+
+                logger.info("Created friend request: " + fromName + " -> " + request.getToUuid());
 
             } catch (SQLException e) {
                 logger.log(Level.SEVERE, "Failed to create request", e);
@@ -279,18 +316,63 @@ public class MySQLFriendRepository {
         }, executor);
     }
 
-    private String getPlayerName(UUID uuid) {
-        // Try to get online player first
-        org.bukkit.entity.Player onlinePlayer = org.bukkit.Bukkit.getPlayer(uuid);
+    // ===== HELPER METHODS =====
+
+    /**
+     * Updates a friend's name in the database.
+     */
+    private void updateFriendName(@NotNull UUID playerUuid, @NotNull UUID friendUuid, @NotNull String friendName) {
+        String sql = "UPDATE social_friends SET friend_name = ? WHERE player_uuid = ? AND friend_uuid = ?";
+
+        try (Connection conn = dataSource.getConnection();
+             PreparedStatement stmt = conn.prepareStatement(sql)) {
+
+            stmt.setString(1, friendName);
+            stmt.setString(2, playerUuid.toString());
+            stmt.setString(3, friendUuid.toString());
+
+            stmt.executeUpdate();
+            logger.fine("Updated friend name: " + friendUuid + " -> " + friendName);
+
+        } catch (SQLException e) {
+            logger.log(Level.WARNING, "Failed to update friend name", e);
+        }
+    }
+
+    /**
+     * Gets a player's name from their UUID.
+     * Tries online players first, then offline players.
+     */
+    @NotNull
+    private String getPlayerNameFromUUID(@NotNull UUID uuid) {
+        // Try online player first (most reliable)
+        org.bukkit.entity.Player onlinePlayer = Bukkit.getPlayer(uuid);
         if (onlinePlayer != null) {
             return onlinePlayer.getName();
         }
 
         // Fall back to offline player
-        org.bukkit.OfflinePlayer offlinePlayer = org.bukkit.Bukkit.getOfflinePlayer(uuid);
+        OfflinePlayer offlinePlayer = Bukkit.getOfflinePlayer(uuid);
         String name = offlinePlayer.getName();
 
         // If name is still null (shouldn't happen), use UUID substring as last resort
-        return name != null ? name : uuid.toString().substring(0, 8);
+        if (name == null || name.isEmpty()) {
+            logger.warning("Could not find name for UUID: " + uuid);
+            return uuid.toString().substring(0, 8);
+        }
+
+        return name;
+    }
+
+    /**
+     * Checks if a string looks like a UUID.
+     */
+    private boolean isUUID(@NotNull String str) {
+        try {
+            UUID.fromString(str);
+            return true;
+        } catch (IllegalArgumentException e) {
+            return false;
+        }
     }
 }

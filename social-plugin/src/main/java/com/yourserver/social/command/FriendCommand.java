@@ -17,21 +17,15 @@ import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 
 /**
- * Friend command handler.
- *
- * Usage:
- * /friend add <player>     - Send friend request
- * /friend remove <player>  - Remove friend
- * /friend accept <player>  - Accept friend request
- * /friend deny <player>    - Deny friend request
- * /friend list             - List all friends (or open GUI)
- * /friend requests         - List pending requests
+ * FIXED: Friend command handler.
+ * Now properly handles usernames vs UUIDs for friend requests.
  */
 public class FriendCommand implements CommandExecutor, TabCompleter {
 
@@ -95,6 +89,12 @@ public class FriendCommand implements CommandExecutor, TabCompleter {
 
         UUID targetUuid = offlineTarget.getUniqueId();
         String actualName = offlineTarget.getName();
+
+        // Validate that we have a proper name
+        if (actualName == null || actualName.isEmpty()) {
+            player.sendMessage(Component.text("Could not find that player!", NamedTextColor.RED));
+            return;
+        }
 
         // Send friend request
         friendManager.sendFriendRequest(player, targetUuid, actualName).thenAccept(result -> {
@@ -309,6 +309,20 @@ public class FriendCommand implements CommandExecutor, TabCompleter {
         }
 
         if (args.length == 2) {
+            String subCommand = args[0].toLowerCase();
+
+            // For accept/deny, show pending request names
+            if (subCommand.equals("accept") || subCommand.equals("deny")) {
+                if (sender instanceof Player player) {
+                    List<String> names = new ArrayList<>();
+                    friendManager.getPendingRequests(player.getUniqueId()).thenAccept(requests -> {
+                        requests.forEach(req -> names.add(req.getFromName()));
+                    });
+                    return names;
+                }
+            }
+
+            // For other commands, show online players
             return Bukkit.getOnlinePlayers().stream()
                     .map(Player::getName)
                     .collect(Collectors.toList());

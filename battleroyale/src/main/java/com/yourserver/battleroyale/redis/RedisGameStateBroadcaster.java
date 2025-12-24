@@ -11,12 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
- * FIXED Redis broadcaster with proper CloudNet 4.0 API integration.
- *
- * CloudNet 4.0 Changes:
- * - Uses InjectionLayer.ext() instead of InjectionLayer.boot()
- * - Proper dependency injection for ServiceInfoSnapshot
- * - Better error handling for missing CloudNet environment
+ * FIXED: Redis broadcaster with working CloudNet 4.0 detection.
  */
 public class RedisGameStateBroadcaster {
 
@@ -26,7 +21,9 @@ public class RedisGameStateBroadcaster {
     private final String gamemodeId;
     private final String channelPrefix;
 
+    private final CloudNetServiceDetector cloudNetDetector;
     private final String serviceName;
+
     private final String stateChannel;
     private final String heartbeatChannel;
     private final String controlChannel;
@@ -54,8 +51,9 @@ public class RedisGameStateBroadcaster {
         this.channelPrefix = channelPrefix;
         this.initialized = new AtomicBoolean(false);
 
-        // Get service name from CloudNet system properties (set by wrapper)
-        this.serviceName = detectServiceName();
+        // FIXED: Use detector to get service name
+        this.cloudNetDetector = new CloudNetServiceDetector(plugin);
+        this.serviceName = cloudNetDetector.detectServiceName();
 
         this.stateChannel = channelPrefix + ":state";
         this.heartbeatChannel = channelPrefix + ":heartbeat";
@@ -68,27 +66,16 @@ public class RedisGameStateBroadcaster {
         plugin.getLogger().info("  State Channel: " + stateChannel);
         plugin.getLogger().info("  Heartbeat Channel: " + heartbeatChannel);
         plugin.getLogger().info("  Control Channel: " + controlChannel);
-        plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-    }
 
-    /**
-     * Detect CloudNet service name - SIMPLE VERSION.
-     * CloudNet wrapper sets system properties automatically.
-     */
-    @NotNull
-    private String detectServiceName() {
-        // CloudNet 4.0: Wrapper sets this property
-        String name = System.getProperty("cloudnet.service.name");
-
-        if (name != null && !name.isEmpty()) {
-            plugin.getLogger().info("✓ CloudNet service: " + name);
-            return name;
+        // Debug CloudNet detection
+        if (cloudNetDetector.isCloudNetEnvironment()) {
+            plugin.getLogger().info("  CloudNet: DETECTED ✓");
+        } else {
+            plugin.getLogger().warning("  CloudNet: NOT DETECTED ⚠");
+            plugin.getLogger().warning("  Run /brdebug to see debug info");
         }
 
-        // Fallback
-        name = Bukkit.getServer().getName();
-        plugin.getLogger().warning("⚠ CloudNet property not set, using: " + name);
-        return name;
+        plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
     public void initialize() {
@@ -124,6 +111,8 @@ public class RedisGameStateBroadcaster {
     private void broadcastInitialState() {
         broadcastState("WAITING", 0, lastMaxPlayers, 0, null);
         plugin.getLogger().info("✓ Initial state broadcasted to Redis");
+        plugin.getLogger().info("  Service: " + serviceName);
+        plugin.getLogger().info("  Channel: " + stateChannel);
     }
 
     public void broadcastState(
@@ -146,7 +135,7 @@ public class RedisGameStateBroadcaster {
             this.lastGameId = gameId;
 
             JsonObject json = new JsonObject();
-            json.addProperty("service", serviceName);
+            json.addProperty("service", serviceName);  // ✅ FIXED: Using detected name
             json.addProperty("state", state.toUpperCase());
             json.addProperty("players", currentPlayers);
             json.addProperty("maxPlayers", maxPlayers);
@@ -172,7 +161,7 @@ public class RedisGameStateBroadcaster {
 
         try {
             JsonObject json = new JsonObject();
-            json.addProperty("service", serviceName);
+            json.addProperty("service", serviceName);  // ✅ FIXED
             json.addProperty("players", currentPlayers);
             json.addProperty("timestamp", System.currentTimeMillis());
 
@@ -230,28 +219,8 @@ public class RedisGameStateBroadcaster {
     }
 
     @NotNull
-    public String getGamemodeId() {
-        return gamemodeId;
-    }
-
-    @NotNull
-    public String getChannelPrefix() {
-        return channelPrefix;
-    }
-
-    @NotNull
-    public String getStateChannel() {
-        return stateChannel;
-    }
-
-    @NotNull
-    public String getHeartbeatChannel() {
-        return heartbeatChannel;
-    }
-
-    @NotNull
-    public String getControlChannel() {
-        return controlChannel;
+    public CloudNetServiceDetector getCloudNetDetector() {
+        return cloudNetDetector;
     }
 
     public boolean isInitialized() {

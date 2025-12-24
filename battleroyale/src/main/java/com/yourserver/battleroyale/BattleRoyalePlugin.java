@@ -58,6 +58,86 @@ public class BattleRoyalePlugin extends JavaPlugin {
         getLogger().info("  CLOUDNET_SERVICE_NAME = " + System.getenv("CLOUDNET_SERVICE_NAME"));
         getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
+        getLogger().info("━━━━━━━━ CLOUDNET DETECTION DEBUG ━━━━━━━━");
+        getLogger().info("Checking ALL possible CloudNet properties...");
+
+// CloudNet 4.0 properties
+        String cn4Name = System.getProperty("cloudnet.wrapper.serviceInfo.name");
+        String cn4Uid = System.getProperty("cloudnet.wrapper.serviceInfo.uniqueId");
+        String cn4Task = System.getProperty("cloudnet.wrapper.serviceInfo.taskName");
+        String cn4Node = System.getProperty("cloudnet.wrapper.serviceInfo.nodeUniqueId");
+
+        getLogger().info("CloudNet 4.0 Properties:");
+        getLogger().info("  cloudnet.wrapper.serviceInfo.name = " + cn4Name);
+        getLogger().info("  cloudnet.wrapper.serviceInfo.uniqueId = " + cn4Uid);
+        getLogger().info("  cloudnet.wrapper.serviceInfo.taskName = " + cn4Task);
+        getLogger().info("  cloudnet.wrapper.serviceInfo.nodeUniqueId = " + cn4Node);
+
+// CloudNet 3.x properties (legacy)
+        String cn3Name = System.getProperty("cloudnet.service.name");
+        String cn3Group = System.getProperty("cloudnet.service.group");
+        String cn3Task = System.getProperty("cloudnet.service.task");
+        String cn3Uid = System.getProperty("cloudnet.service.uid");
+
+        getLogger().info("CloudNet 3.x Properties (legacy):");
+        getLogger().info("  cloudnet.service.name = " + cn3Name);
+        getLogger().info("  cloudnet.service.group = " + cn3Group);
+        getLogger().info("  cloudnet.service.task = " + cn3Task);
+        getLogger().info("  cloudnet.service.uid = " + cn3Uid);
+
+// Environment variables
+        String envName = System.getenv("CLOUDNET_SERVICE_NAME");
+        String envId = System.getenv("CLOUDNET_SERVICE_ID");
+
+        getLogger().info("Environment Variables:");
+        getLogger().info("  CLOUDNET_SERVICE_NAME = " + envName);
+        getLogger().info("  CLOUDNET_SERVICE_ID = " + envId);
+
+// Server name fallback
+        getLogger().info("Server Name (fallback): " + getServer().getName());
+
+// ALL system properties (find any cloudnet related)
+        getLogger().info("Searching ALL system properties for 'cloudnet'...");
+        System.getProperties().stringPropertyNames().stream()
+                .filter(key -> key.toLowerCase().contains("cloudnet"))
+                .forEach(key -> getLogger().info("  " + key + " = " + System.getProperty(key)));
+
+        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+// Try CloudNet API
+        getLogger().info("Attempting CloudNet API detection...");
+        try {
+            Class<?> injectionLayerClass = Class.forName("eu.cloudnetservice.driver.inject.InjectionLayer");
+            getLogger().info("  ✓ InjectionLayer class found");
+
+            Object injectionLayer = injectionLayerClass.getMethod("ext").invoke(null);
+            getLogger().info("  ✓ InjectionLayer instance obtained");
+
+            Class<?> serviceInfoClass = Class.forName("eu.cloudnetservice.driver.service.ServiceInfoSnapshot");
+            getLogger().info("  ✓ ServiceInfoSnapshot class found");
+
+            Object serviceInfo = injectionLayer.getClass()
+                    .getMethod("instance", Class.class)
+                    .invoke(injectionLayer, serviceInfoClass);
+
+            if (serviceInfo != null) {
+                String apiName = (String) serviceInfo.getClass().getMethod("name").invoke(serviceInfo);
+                getLogger().info("  ✓ CloudNet API service name: " + apiName);
+            } else {
+                getLogger().warning("  ✗ ServiceInfoSnapshot is null");
+            }
+
+        } catch (ClassNotFoundException e) {
+            getLogger().warning("  ✗ CloudNet driver classes not found");
+            getLogger().warning("  ✗ This means CloudNet is NOT available");
+        } catch (Exception e) {
+            getLogger().warning("  ✗ CloudNet API error: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+
         try {
             // 1. Get CorePlugin (required for Redis and player data)
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");

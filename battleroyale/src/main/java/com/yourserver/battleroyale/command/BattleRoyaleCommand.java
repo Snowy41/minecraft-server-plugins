@@ -61,6 +61,7 @@ public class BattleRoyaleCommand implements CommandExecutor, TabCompleter {
             case "forcestart" -> handleForceStart(sender);
             case "stop" -> handleStop(sender);
             case "list" -> handleList(sender);
+            case "cloudnet" -> handleCloudNetDebug(sender);
             default -> {
                 sendHelp(sender);
                 yield true;
@@ -68,6 +69,13 @@ public class BattleRoyaleCommand implements CommandExecutor, TabCompleter {
         };
     }
 
+    private boolean handleCloudNetDebug(CommandSender sender) {
+        if (plugin.getBroadcaster() != null) {
+            plugin.getBroadcaster().getCloudNetDetector().debugProperties();
+            sender.sendMessage("§aCheck console for CloudNet debug output");
+        }
+        return true;
+    }
     /**
      * Handles /br join
      */

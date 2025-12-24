@@ -6,31 +6,17 @@ import com.yourserver.gamelobby.listener.MenuListener;
 import com.yourserver.gamelobby.manager.GameMenuManager;
 import com.yourserver.gamelobby.manager.GameServiceManager;
 import org.bukkit.plugin.java.JavaPlugin;
+import org.bukkit.plugin.messaging.PluginMessageListener;
 
 import java.util.logging.Level;
 
 /**
- * Generic Game Lobby Plugin
+ * Generic Game Lobby Plugin - FIXED VERSION
  *
- * Works for ANY CloudNet-based gamemode:
- * - BattleRoyale
- * - SkyWars
- * - BedWars
- * - Duels
- * - etc.
- *
- * Features:
- * - Generic GUI system with live updates
- * - Redis pub/sub for real-time state tracking
- * - CloudNet service detection
- * - Configurable gamemode support
- * - Modular and extensible
- *
- * Configuration:
- * Each gamemode has its own config section:
- * - battleroyale.enabled: true
- * - skywars.enabled: true
- * - etc.
+ * FIXES:
+ * 1. Proper plugin messaging channel registration
+ * 2. Better service name detection
+ * 3. Improved error handling
  */
 public class GameLobbyPlugin extends JavaPlugin {
 
@@ -49,40 +35,44 @@ public class GameLobbyPlugin extends JavaPlugin {
         getLogger().info("Enabling GameLobbyPlugin...");
 
         try {
-            // 1. Get CorePlugin (required for Redis)
+            // 1. Get CorePlugin
             corePlugin = (CorePlugin) getServer().getPluginManager().getPlugin("CorePlugin");
             if (corePlugin == null) {
-                throw new IllegalStateException("CorePlugin not found! GameLobbyPlugin requires CorePlugin.");
+                throw new IllegalStateException("CorePlugin not found!");
             }
             getLogger().info("✓ CorePlugin found");
 
-            // 2. Check Redis availability
-            if (corePlugin.getRedisManager() == null) {
-                throw new IllegalStateException("Redis is not connected! This plugin requires Redis for real-time updates.");
+            // 2. Check Redis
+            if (corePlugin.getRedisManager() == null || !corePlugin.getRedisManager().isConnected()) {
+                throw new IllegalStateException("Redis is not connected!");
             }
             getLogger().info("✓ Redis connected");
 
-            // 3. Initialize service manager (tracks all game services)
+            // 3. Register plugin messaging channels (FIXED)
+            registerPluginMessaging();
+            getLogger().info("✓ Plugin messaging registered");
+
+            // 4. Initialize service manager
             serviceManager = new GameServiceManager(this, corePlugin);
             serviceManager.initialize();
             getLogger().info("✓ Service manager initialized");
 
-            // 4. Initialize menu manager (handles all GUIs)
+            // 5. Initialize menu manager
             menuManager = new GameMenuManager(this, serviceManager);
             getLogger().info("✓ Menu manager initialized");
 
-            // 5. Register listeners
+            // 6. Register listeners
             getServer().getPluginManager().registerEvents(
                     new MenuListener(menuManager),
                     this
             );
             getLogger().info("✓ Event listeners registered");
 
-            // 6. Register commands for each enabled gamemode
+            // 7. Register commands
             registerGameCommands();
             getLogger().info("✓ Commands registered");
 
-            // 7. Display enabled gamemodes
+            // 8. Log enabled gamemodes
             logEnabledGamemodes();
 
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
@@ -102,6 +92,10 @@ public class GameLobbyPlugin extends JavaPlugin {
     public void onDisable() {
         getLogger().info("Disabling GameLobbyPlugin...");
 
+        // Unregister plugin messaging
+        getServer().getMessenger().unregisterIncomingPluginChannel(this);
+        getServer().getMessenger().unregisterOutgoingPluginChannel(this);
+
         if (serviceManager != null) {
             serviceManager.shutdown();
             getLogger().info("✓ Service manager shut down");
@@ -111,13 +105,27 @@ public class GameLobbyPlugin extends JavaPlugin {
     }
 
     /**
+     * FIXED: Properly register plugin messaging channels for Velocity.
+     */
+    private void registerPluginMessaging() {
+        // Register BOTH incoming and outgoing channels
+        getServer().getMessenger().registerOutgoingPluginChannel(this, "bungeecord:main");
+        getServer().getMessenger().registerIncomingPluginChannel(this, "bungeecord:main",
+                (channel, player, message) -> {
+                    getLogger().fine("Received plugin message on channel: " + channel);
+                }
+        );
+
+        getLogger().info("Registered plugin messaging channels for Velocity");
+    }
+
+    /**
      * Registers commands for each enabled gamemode.
      */
     private void registerGameCommands() {
         for (String gamemode : serviceManager.getEnabledGamemodes()) {
             GameMenuCommand command = new GameMenuCommand(menuManager, gamemode);
 
-            // Register main command (e.g., /battleroyale, /skywars)
             getCommand(gamemode).setExecutor(command);
             getCommand(gamemode).setTabCompleter(command);
 

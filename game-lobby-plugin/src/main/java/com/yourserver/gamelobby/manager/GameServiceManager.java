@@ -9,7 +9,6 @@ import com.yourserver.gamelobby.model.GameService;
 import com.yourserver.gamelobby.model.GameService.GameState;
 import com.yourserver.gamelobby.model.GamemodeConfig;
 import org.bukkit.Bukkit;
-import org.bukkit.Material;
 import org.bukkit.entity.Player;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -22,14 +21,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * Manages all game services across all gamemodes.
- *
- * Features:
- * - Tracks services for ALL gamemodes (BattleRoyale, SkyWars, etc.)
- * - Subscribes to Redis channels for real-time updates
- * - Detects and removes stale services
- * - Handles player connections via Velocity
- * - Provides gamemode configuration
+ * FIXED: GameServiceManager with CloudNet 4.0 support.
  */
 public class GameServiceManager {
 
@@ -37,14 +29,13 @@ public class GameServiceManager {
     private final CorePlugin corePlugin;
     private final RedisMessenger redisMessenger;
 
-    // All game services (key: serviceName, value: GameService)
     private final Map<String, GameService> services;
-
-    // Gamemode configurations (key: gamemodeId, value: GamemodeConfig)
     private final Map<String, GamemodeConfig> gamemodes;
 
-    // Stale service detection
     private static final long HEARTBEAT_TIMEOUT_SECONDS = 30;
+
+    // FIXED: Store current CloudNet service name
+    private final String currentServiceName;
 
     public GameServiceManager(@NotNull GameLobbyPlugin plugin, @NotNull CorePlugin corePlugin) {
         this.plugin = plugin;
@@ -52,33 +43,56 @@ public class GameServiceManager {
         this.redisMessenger = corePlugin.getRedisManager();
         this.services = new ConcurrentHashMap<>();
         this.gamemodes = new LinkedHashMap<>();
+
+        // FIXED: Detect current CloudNet service using CloudNet 4.0 API
+        this.currentServiceName = detectCurrentServiceName();
+        plugin.getLogger().info("Running on CloudNet service: " + currentServiceName);
     }
 
     /**
-     * Initializes the service manager.
-     * Loads gamemode configs and subscribes to Redis channels.
+     * FIXED: Detect current CloudNet service name using CloudNet 4.0 API.
      */
+    @NotNull
+    private String detectCurrentServiceName() {
+        try {
+            var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
+            var serviceInfoSnapshot = injectionLayer.instance(
+                    eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class
+            );
+
+            if (serviceInfoSnapshot != null) {
+                String name = serviceInfoSnapshot.name();
+                if (name != null && !name.isEmpty()) {
+                    plugin.getLogger().info("✓ Detected CloudNet service: " + name);
+                    return name;
+                }
+            }
+        } catch (NoClassDefFoundError e) {
+            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            plugin.getLogger().severe("❌ CRITICAL: CloudNet 4.0 API not found!");
+            plugin.getLogger().severe("❌ GameLobbyPlugin requires CloudNet 4.0!");
+            plugin.getLogger().severe("❌ Add CloudNet dependency to build.gradle.kts");
+            plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            throw new IllegalStateException("CloudNet 4.0 API not available!", e);
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to detect CloudNet service: " + e.getMessage());
+            throw new IllegalStateException("Failed to detect CloudNet service name!", e);
+        }
+
+        throw new IllegalStateException("CloudNet service info not available!");
+    }
+
     public void initialize() {
         plugin.getLogger().info("Initializing GameServiceManager...");
 
-        // 1. Load gamemode configurations from config.yml
         loadGamemodeConfigs();
-
-        // 2. Subscribe to Redis channels for each gamemode
         subscribeToRedisChannels();
-
-        // 3. Start stale service detection
         startStaleServiceDetection();
-
-        // 4. Request initial state from all services
         requestInitialStates();
 
         plugin.getLogger().info("GameServiceManager initialized successfully!");
     }
 
-    /**
-     * Loads gamemode configurations from config.yml.
-     */
     private void loadGamemodeConfigs() {
         plugin.getLogger().info("Loading gamemode configurations...");
 
@@ -104,20 +118,18 @@ public class GameServiceManager {
             String iconMaterialName = config.getString(path + ".icon-material", "DIAMOND_SWORD");
             List<String> description = config.getStringList(path + ".description");
 
-            // ADD THESE LINES - Read custom channels from config
             String stateChannel = config.getString(path + ".state-channel", null);
             String heartbeatChannel = config.getString(path + ".heartbeat-channel", null);
             String controlChannel = config.getString(path + ".control-channel", null);
 
-            Material iconMaterial;
+            org.bukkit.Material iconMaterial;
             try {
-                iconMaterial = Material.valueOf(iconMaterialName.toUpperCase());
+                iconMaterial = org.bukkit.Material.valueOf(iconMaterialName.toUpperCase());
             } catch (IllegalArgumentException e) {
                 plugin.getLogger().warning("Invalid material '" + iconMaterialName + "' for " + gamemodeId + ", using DIAMOND_SWORD");
-                iconMaterial = Material.DIAMOND_SWORD;
+                iconMaterial = org.bukkit.Material.DIAMOND_SWORD;
             }
 
-            // UPDATE THIS PART - Add custom channels to builder
             GamemodeConfig.Builder builder = new GamemodeConfig.Builder()
                     .id(gamemodeId)
                     .displayName(displayName)
@@ -126,7 +138,6 @@ public class GameServiceManager {
                     .description(description)
                     .enabled(true);
 
-            // Set custom channels if provided in config
             if (stateChannel != null) {
                 builder.stateChannel(stateChannel);
             }
@@ -141,7 +152,6 @@ public class GameServiceManager {
 
             gamemodes.put(gamemodeId, gamemodeConfig);
             plugin.getLogger().info("  ✓ Loaded: " + gamemodeId + " (" + displayName + ")");
-            // ADD THIS LINE - Log which channels are being used
             plugin.getLogger().info("    Channels: " + gamemodeConfig.getStateChannel() +
                     ", " + gamemodeConfig.getHeartbeatChannel());
         }
@@ -149,15 +159,10 @@ public class GameServiceManager {
         plugin.getLogger().info("Loaded " + gamemodes.size() + " gamemode(s)");
     }
 
-    /**
-     * Subscribes to Redis channels for all enabled gamemodes.
-     * Uses CorePlugin's RedisManager (RedisMessenger interface) for pub/sub.
-     */
     private void subscribeToRedisChannels() {
         plugin.getLogger().info("Subscribing to Redis channels...");
 
         for (GamemodeConfig gamemode : gamemodes.values()) {
-            // Subscribe to state channel (e.g., "br:state", "sw:state")
             String stateChannel = gamemode.getStateChannel();
             redisMessenger.subscribe(
                     stateChannel,
@@ -165,7 +170,6 @@ public class GameServiceManager {
             );
             plugin.getLogger().info("  ✓ Subscribed: " + stateChannel);
 
-            // Subscribe to heartbeat channel (e.g., "br:heartbeat", "sw:heartbeat")
             String heartbeatChannel = gamemode.getHeartbeatChannel();
             redisMessenger.subscribe(
                     heartbeatChannel,
@@ -177,9 +181,6 @@ public class GameServiceManager {
         plugin.getLogger().info("Subscribed to " + (gamemodes.size() * 2) + " Redis channels");
     }
 
-    /**
-     * Handles state updates from Redis.
-     */
     private void handleStateUpdate(@NotNull GamemodeConfig gamemode, @NotNull String message) {
         try {
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
@@ -192,13 +193,11 @@ public class GameServiceManager {
 
             GameState state = GameState.fromString(stateStr);
 
-            // Get or create service
             GameService service = services.computeIfAbsent(
                     serviceName,
                     name -> new GameService(name, gamemode.getId())
             );
 
-            // Update service data
             service.updateState(state);
             service.updatePlayers(players, maxPlayers);
             service.updateAlive(alive);
@@ -214,9 +213,6 @@ public class GameServiceManager {
         }
     }
 
-    /**
-     * Handles heartbeat updates from Redis.
-     */
     private void handleHeartbeat(@NotNull GamemodeConfig gamemode, @NotNull String message) {
         try {
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
@@ -224,13 +220,11 @@ public class GameServiceManager {
             String serviceName = json.get("service").getAsString();
             int players = json.has("players") ? json.get("players").getAsInt() : 0;
 
-            // Get or create service
             GameService service = services.computeIfAbsent(
                     serviceName,
                     name -> new GameService(name, gamemode.getId())
             );
 
-            // Update heartbeat
             service.updateHeartbeat();
             service.setCurrentPlayers(players);
 
@@ -241,9 +235,6 @@ public class GameServiceManager {
         }
     }
 
-    /**
-     * Starts periodic stale service detection.
-     */
     private void startStaleServiceDetection() {
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
             int staleCount = 0;
@@ -262,12 +253,9 @@ public class GameServiceManager {
                 plugin.getLogger().info("Detected " + staleCount + " stale service(s)");
             }
 
-        }, 200L, 200L); // Every 10 seconds
+        }, 200L, 200L);
     }
 
-    /**
-     * Requests initial state from all game services.
-     */
     private void requestInitialStates() {
         plugin.getLogger().info("Requesting initial states from game services...");
 
@@ -284,7 +272,7 @@ public class GameServiceManager {
     }
 
     /**
-     * Connects a player to a game service via Velocity.
+     * FIXED: Connect player to CloudNet service via Velocity plugin messaging.
      */
     public void connectPlayer(@NotNull Player player, @NotNull String serviceName) {
         GameService service = services.get(serviceName);
@@ -307,7 +295,6 @@ public class GameServiceManager {
             return;
         }
 
-        // Send via Velocity plugin messaging
         try {
             ByteArrayOutputStream b = new ByteArrayOutputStream();
             DataOutputStream out = new DataOutputStream(b);
@@ -317,7 +304,6 @@ public class GameServiceManager {
 
             byte[] data = b.toByteArray();
 
-            // Try Velocity channel first (modern)
             boolean sent = false;
             try {
                 player.sendPluginMessage(plugin, "velocity:main", data);
@@ -327,7 +313,6 @@ public class GameServiceManager {
                 plugin.getLogger().warning("Failed to send via velocity:main: " + e.getMessage());
             }
 
-            // Fallback to BungeeCord channel
             if (!sent) {
                 try {
                     player.sendPluginMessage(plugin, "bungeecord:main", data);
@@ -352,11 +337,6 @@ public class GameServiceManager {
         }
     }
 
-    // ===== PUBLIC API =====
-
-    /**
-     * Gets all services for a specific gamemode.
-     */
     @NotNull
     public List<GameService> getServices(@NotNull String gamemodeId) {
         return services.values().stream()
@@ -365,48 +345,35 @@ public class GameServiceManager {
                 .collect(Collectors.toList());
     }
 
-    /**
-     * Gets a specific service by name.
-     */
     @Nullable
     public GameService getService(@NotNull String serviceName) {
         return services.get(serviceName);
     }
 
-    /**
-     * Gets gamemode configuration.
-     */
     @Nullable
     public GamemodeConfig getGamemodeConfig(@NotNull String gamemodeId) {
         return gamemodes.get(gamemodeId);
     }
 
-    /**
-     * Gets all enabled gamemode IDs.
-     */
     @NotNull
     public Set<String> getEnabledGamemodes() {
         return new LinkedHashSet<>(gamemodes.keySet());
     }
 
-    /**
-     * Gets all gamemode configurations.
-     */
     @NotNull
     public Collection<GamemodeConfig> getAllGamemodes() {
         return new ArrayList<>(gamemodes.values());
     }
 
-    /**
-     * Checks if a gamemode is enabled.
-     */
     public boolean isGamemodeEnabled(@NotNull String gamemodeId) {
         return gamemodes.containsKey(gamemodeId);
     }
 
-    /**
-     * Shuts down the service manager.
-     */
+    @NotNull
+    public String getCurrentServiceName() {
+        return currentServiceName;
+    }
+
     public void shutdown() {
         plugin.getLogger().info("Shutting down GameServiceManager...");
         services.clear();

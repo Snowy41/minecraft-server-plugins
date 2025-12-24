@@ -10,6 +10,10 @@ java {
     }
 }
 
+repositories {
+    maven("https://s01.oss.sonatype.org/content/repositories/snapshots/")
+}
+
 dependencies {
     // API Module
     implementation(project(":api-module"))
@@ -46,6 +50,10 @@ dependencies {
 
     // Gson for JSON (if needed for migration)
     implementation("com.google.code.gson:gson:2.10.1")
+
+    compileOnly("eu.cloudnetservice.cloudnet:driver:4.0.0-RC10")
+    compileOnly("eu.cloudnetservice.cloudnet:wrapper-jvm:4.0.0-RC10")
+    compileOnly("eu.cloudnetservice.cloudnet:common:4.0.0-RC10")
 
     // Testing
     testImplementation("com.github.seeseemelk:MockBukkit-v1.21:3.95.1")

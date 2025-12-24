@@ -495,18 +495,30 @@ public class CorePlugin extends JavaPlugin {
         }
 
         public static CloudNetServiceInfo detect(java.util.logging.Logger logger) {
-            String name = System.getProperty("cloudnet.service.name");
-            String group = System.getProperty("cloudnet.service.group");
-            String task = System.getProperty("cloudnet.service.task");
-            String uid = System.getProperty("cloudnet.service.uid");
+            try {
+                // Use CloudNet 4.0 dependency injection API
+                var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
+                var serviceInfoSnapshot = injectionLayer.instance(eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class);
 
-            if (name != null) {
-                logger.info("Detected CloudNet 4.0 service: " + name);
-            } else {
-                logger.info("Running in standalone mode (not CloudNet)");
+                if (serviceInfoSnapshot != null) {
+                    String name = serviceInfoSnapshot.name();
+                    String group = serviceInfoSnapshot.configuration().groups().isEmpty()
+                            ? "Unknown"
+                            : serviceInfoSnapshot.configuration().groups().iterator().next();
+                    String task = serviceInfoSnapshot.configuration().serviceId().taskName();
+                    String uid = serviceInfoSnapshot.configuration().serviceId().uniqueId().toString();
+
+                    logger.info("✓ Detected CloudNet 4.0 service: " + name);
+                    return new CloudNetServiceInfo(name, group, task, uid);
+                }
+            } catch (NoClassDefFoundError | Exception e) {
+                logger.info("CloudNet 4.0 not detected - running in standalone mode");
+                logger.fine("Detection error: " + e.getMessage());
             }
 
-            return new CloudNetServiceInfo(name, group, task, uid);
+            // Not an error - just running standalone
+            logger.info("Running in standalone mode (not CloudNet)");
+            return new CloudNetServiceInfo(null, null, null, null);
         }
 
         public void logInfo() {

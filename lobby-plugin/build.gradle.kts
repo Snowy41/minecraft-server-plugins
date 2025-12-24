@@ -31,6 +31,10 @@ dependencies {
     // Soft dependencies (optional plugins)
     compileOnly("net.luckperms:api:5.4")
 
+    compileOnly("eu.cloudnetservice.cloudnet:driver:4.0.0-RC10")
+    compileOnly("eu.cloudnetservice.cloudnet:wrapper-jvm:4.0.0-RC10")
+    compileOnly("eu.cloudnetservice.cloudnet:common:4.0.0-RC10")
+
     // Testing
     testImplementation("com.github.seeseemelk:MockBukkit-v1.21:3.95.1")
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")

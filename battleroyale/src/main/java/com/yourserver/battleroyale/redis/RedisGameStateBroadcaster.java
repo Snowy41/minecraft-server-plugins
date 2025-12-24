@@ -11,13 +11,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.logging.Level;
 
 /**
- * FIXED Redis broadcaster with proper CloudNet service detection.
- *
- * FIXES:
- * 1. Proper CloudNet service name detection
- * 2. Immediate initial state broadcast
- * 3. Better error handling
- * 4. Control message handling for state requests
+ * FIXED Redis broadcaster with CloudNet 4.0 API integration.
  */
 public class RedisGameStateBroadcaster {
 
@@ -34,7 +28,6 @@ public class RedisGameStateBroadcaster {
 
     private final AtomicBoolean initialized;
 
-    // Last known state (for responding to requests)
     private volatile String lastState = "WAITING";
     private volatile int lastPlayers = 0;
     private volatile int lastMaxPlayers = 100;
@@ -56,10 +49,9 @@ public class RedisGameStateBroadcaster {
         this.channelPrefix = channelPrefix;
         this.initialized = new AtomicBoolean(false);
 
-        // FIXED: Proper CloudNet service detection
+        // FIXED: Use CloudNet 4.0 API to detect service
         this.serviceName = detectServiceName();
 
-        // Build channel names
         this.stateChannel = channelPrefix + ":state";
         this.heartbeatChannel = channelPrefix + ":heartbeat";
         this.controlChannel = channelPrefix + ":control";
@@ -74,27 +66,37 @@ public class RedisGameStateBroadcaster {
         plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
+    /**
+     * FIXED: Detect CloudNet service name using CloudNet 4.0 API.
+     */
     @NotNull
     private String detectServiceName() {
-        // Use CloudNet 4.0 API to get service name
         try {
+            // Use CloudNet 4.0 dependency injection API
             var injectionLayer = eu.cloudnetservice.driver.inject.InjectionLayer.ext();
-            var serviceInfoSnapshot = injectionLayer.instance(eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class);
+            var serviceInfoSnapshot = injectionLayer.instance(
+                    eu.cloudnetservice.driver.service.ServiceInfoSnapshot.class
+            );
 
-            String name = serviceInfoSnapshot.name();
-            if (name != null && !name.isEmpty()) {
-                plugin.getLogger().info("✓ Detected CloudNet service: " + name);
-                return name;
+            if (serviceInfoSnapshot != null) {
+                String name = serviceInfoSnapshot.name();
+                if (name != null && !name.isEmpty()) {
+                    plugin.getLogger().info("✓ Detected CloudNet service: " + name);
+                    return name;
+                }
             }
-        } catch (NoClassDefFoundError | Exception e) {
+        } catch (NoClassDefFoundError e) {
             plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             plugin.getLogger().severe("❌ CRITICAL: CloudNet 4.0 API not found!");
-            plugin.getLogger().severe("❌ This plugin REQUIRES CloudNet 4.0 to function!");
+            plugin.getLogger().severe("❌ Make sure CloudNet driver is in your dependencies!");
             plugin.getLogger().severe("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             throw new IllegalStateException("CloudNet 4.0 API not available!", e);
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to detect CloudNet service: " + e.getMessage());
+            throw new IllegalStateException("Failed to detect CloudNet service name!", e);
         }
 
-        throw new IllegalStateException("Failed to detect CloudNet service name!");
+        throw new IllegalStateException("CloudNet service info not available!");
     }
 
     public void initialize() {
@@ -108,15 +110,12 @@ public class RedisGameStateBroadcaster {
                 throw new IllegalStateException("Redis is not available!");
             }
 
-            // Subscribe to control channel for state requests
             redisMessenger.subscribe(controlChannel, this::handleControlMessage);
             plugin.getLogger().info("✓ Subscribed to control channel: " + controlChannel);
 
-            // Start heartbeat task
             startHeartbeatTask();
             plugin.getLogger().info("✓ Heartbeat task started");
 
-            // FIXED: Broadcast initial state immediately
             broadcastInitialState();
 
             plugin.getLogger().info("✓ Redis broadcaster initialized successfully!");
@@ -127,18 +126,11 @@ public class RedisGameStateBroadcaster {
         }
     }
 
-    /**
-     * FIXED: Broadcast initial state immediately after initialization.
-     */
     private void broadcastInitialState() {
-        // Broadcast initial WAITING state
         broadcastState("WAITING", 0, lastMaxPlayers, 0, null);
         plugin.getLogger().info("✓ Initial state broadcasted to Redis");
     }
 
-    /**
-     * Broadcasts game state to Redis.
-     */
     public void broadcastState(
             @NotNull String state,
             int currentPlayers,
@@ -152,7 +144,6 @@ public class RedisGameStateBroadcaster {
         }
 
         try {
-            // Store last known state
             this.lastState = state;
             this.lastPlayers = currentPlayers;
             this.lastMaxPlayers = maxPlayers;
@@ -181,9 +172,6 @@ public class RedisGameStateBroadcaster {
         }
     }
 
-    /**
-     * Broadcasts a heartbeat to Redis.
-     */
     public void broadcastHeartbeat(int currentPlayers) {
         if (!initialized.get()) return;
 
@@ -202,16 +190,11 @@ public class RedisGameStateBroadcaster {
         }
     }
 
-    /**
-     * FIXED: Handle control messages (state requests from lobby).
-     */
     private void handleControlMessage(@NotNull String message) {
         try {
             plugin.getLogger().fine("Received control message: " + message);
 
-            // Check if it's a state request
             if (message.contains("request_state")) {
-                // Re-broadcast current state
                 broadcastState(lastState, lastPlayers, lastMaxPlayers, lastAlive, lastGameId);
                 plugin.getLogger().fine("Re-broadcasted state in response to request");
             }
@@ -221,9 +204,6 @@ public class RedisGameStateBroadcaster {
         }
     }
 
-    /**
-     * Starts the heartbeat task.
-     */
     private void startHeartbeatTask() {
         Bukkit.getScheduler().runTaskTimerAsynchronously(
                 plugin,
@@ -247,8 +227,6 @@ public class RedisGameStateBroadcaster {
             redisMessenger.unsubscribe(controlChannel);
         }
     }
-
-    // ===== GETTERS =====
 
     @NotNull
     public String getServiceName() {

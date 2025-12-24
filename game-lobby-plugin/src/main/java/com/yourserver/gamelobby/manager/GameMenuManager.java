@@ -4,6 +4,8 @@ import com.yourserver.gamelobby.GameLobbyPlugin;
 import com.yourserver.gamelobby.model.GameService;
 import com.yourserver.gamelobby.model.GameService.GameState;
 import com.yourserver.gamelobby.model.GamemodeConfig;
+import net.kyori.adventure.text.Component;
+import net.kyori.adventure.text.format.NamedTextColor;
 import org.bukkit.Bukkit;
 import org.bukkit.Material;
 import org.bukkit.entity.Player;
@@ -15,14 +17,12 @@ import org.jetbrains.annotations.NotNull;
 import java.util.*;
 
 /**
- * Manages GUIs for all gamemodes.
+ * FIXED GameMenuManager
  *
- * Features:
- * - Dynamic GUI generation for any gamemode
- * - Real-time updates (auto-refresh every 2 seconds)
- * - Color-coded server states
- * - Click-to-join functionality
- * - Multi-page support (for many servers)
+ * Key Fixes:
+ * 1. ✅ Store service name in item NBT/lore for reliable extraction
+ * 2. ✅ Better click handler with fallback service lookup
+ * 3. ✅ Clear error messages for debugging
  */
 public class GameMenuManager {
 
@@ -32,6 +32,9 @@ public class GameMenuManager {
     // Currently open menus (key: UUID, value: gamemodeId)
     private final Map<UUID, String> openMenus;
 
+    // Store service names by slot (key: playerUUID + slot, value: serviceName)
+    private final Map<String, String> slotServiceMap;
+
     // Menu refresh interval
     private static final long REFRESH_INTERVAL_TICKS = 40L; // 2 seconds
 
@@ -39,6 +42,7 @@ public class GameMenuManager {
         this.plugin = plugin;
         this.serviceManager = serviceManager;
         this.openMenus = new HashMap<>();
+        this.slotServiceMap = new HashMap<>();
 
         // Start menu refresh task
         startMenuRefreshTask();
@@ -51,26 +55,30 @@ public class GameMenuManager {
         GamemodeConfig config = serviceManager.getGamemodeConfig(gamemodeId);
 
         if (config == null) {
-            player.sendMessage("§cGamemode not found: " + gamemodeId);
+            player.sendMessage(Component.text("Gamemode not found: " + gamemodeId, NamedTextColor.RED));
             return;
         }
 
-        Inventory inventory = createGameMenu(config);
+        Inventory inventory = createGameMenu(player, config);
         player.openInventory(inventory);
         openMenus.put(player.getUniqueId(), gamemodeId);
 
-        plugin.getLogger().fine("Opened " + gamemodeId + " menu for " + player.getName());
+        plugin.getLogger().info("Opened " + gamemodeId + " menu for " + player.getName());
     }
 
     /**
      * Creates a gamemode menu inventory.
+     * FIXED: Now stores service names for reliable click handling.
      */
     @NotNull
-    private Inventory createGameMenu(@NotNull GamemodeConfig config) {
+    private Inventory createGameMenu(@NotNull Player player, @NotNull GamemodeConfig config) {
         String title = config.getDisplayName() + " §8| Select Server";
         Inventory inventory = Bukkit.createInventory(null, 54, title);
 
         List<GameService> services = serviceManager.getServices(config.getId());
+
+        plugin.getLogger().info("Creating menu for " + player.getName() +
+                " with " + services.size() + " services");
 
         // Add service items (slots 0-44)
         int slot = 0;
@@ -79,6 +87,13 @@ public class GameMenuManager {
 
             ItemStack item = createServiceItem(service);
             inventory.setItem(slot, item);
+
+            // Store service name for this slot
+            String slotKey = player.getUniqueId() + ":" + slot;
+            slotServiceMap.put(slotKey, service.getServiceName());
+
+            plugin.getLogger().fine("Slot " + slot + " -> " + service.getServiceName());
+
             slot++;
         }
 
@@ -90,6 +105,7 @@ public class GameMenuManager {
 
     /**
      * Creates an item representing a game service.
+     * FIXED: Service name now in display name (no color codes to strip).
      */
     @NotNull
     private ItemStack createServiceItem(@NotNull GameService service) {
@@ -98,7 +114,7 @@ public class GameMenuManager {
         ItemMeta meta = item.getItemMeta();
 
         if (meta != null) {
-            // Display name
+            // FIXED: Simple display name with service name
             meta.setDisplayName("§f" + service.getServiceName());
 
             // Lore
@@ -122,6 +138,9 @@ public class GameMenuManager {
             } else {
                 lore.add("§c✖ Cannot join (game in progress)");
             }
+
+            // HIDDEN: Store service name in last lore line for backup lookup
+            lore.add("§0§r" + service.getServiceName());
 
             meta.setLore(lore);
             item.setItemMeta(meta);
@@ -187,27 +206,65 @@ public class GameMenuManager {
     }
 
     /**
-     * Handles clicking a service item.
+     * FIXED: Handles clicking a service item with improved service lookup.
      */
-    public void handleServiceClick(@NotNull Player player, @NotNull ItemStack clickedItem) {
-        if (clickedItem.getItemMeta() == null) return;
+    public void handleServiceClick(@NotNull Player player, int slot, @NotNull ItemStack clickedItem) {
+        // Method 1: Lookup by slot
+        String slotKey = player.getUniqueId() + ":" + slot;
+        String serviceName = slotServiceMap.get(slotKey);
 
-        String displayName = clickedItem.getItemMeta().getDisplayName();
-        if (displayName == null || displayName.isEmpty()) return;
+        plugin.getLogger().info("Click at slot " + slot + " -> service: " + serviceName);
 
-        // Extract service name from display name
-        String serviceName = displayName.replace("§f", "").trim();
+        // Method 2: Extract from display name (backup)
+        if (serviceName == null && clickedItem.getItemMeta() != null) {
+            String displayName = clickedItem.getItemMeta().getDisplayName();
+            if (displayName != null && !displayName.isEmpty()) {
+                serviceName = displayName.replace("§f", "").trim();
+                plugin.getLogger().info("Extracted from display name: " + serviceName);
+            }
+        }
+
+        // Method 3: Extract from hidden lore (last resort)
+        if (serviceName == null && clickedItem.getItemMeta() != null) {
+            List<String> lore = clickedItem.getItemMeta().getLore();
+            if (lore != null && !lore.isEmpty()) {
+                String lastLine = lore.get(lore.size() - 1);
+                if (lastLine.startsWith("§0§r")) {
+                    serviceName = lastLine.substring(4);
+                    plugin.getLogger().info("Extracted from hidden lore: " + serviceName);
+                }
+            }
+        }
+
+        if (serviceName == null || serviceName.isEmpty()) {
+            player.sendMessage(Component.text("Could not determine server name!", NamedTextColor.RED));
+            plugin.getLogger().warning("Failed to extract service name from item at slot " + slot);
+            return;
+        }
 
         // Verify service exists and is joinable
         GameService service = serviceManager.getService(serviceName);
         if (service == null) {
-            player.sendMessage("§cThat server is no longer available!");
+            player.sendMessage(Component.text("That server is no longer available!", NamedTextColor.RED));
+            plugin.getLogger().warning("Service not found: " + serviceName);
             player.closeInventory();
+            return;
+        }
+
+        // Check if joinable
+        if (!service.isOnline()) {
+            player.sendMessage(Component.text("That server is offline!", NamedTextColor.RED));
+            return;
+        }
+
+        if (!service.isJoinable()) {
+            player.sendMessage(Component.text("That server is not joinable right now!", NamedTextColor.YELLOW));
             return;
         }
 
         // Connect player
         player.closeInventory();
+        player.sendMessage(Component.text("Connecting to " + serviceName + "...", NamedTextColor.GREEN));
         serviceManager.connectPlayer(player, serviceName);
     }
 
@@ -218,7 +275,7 @@ public class GameMenuManager {
         String gamemodeId = openMenus.get(player.getUniqueId());
         if (gamemodeId != null) {
             openGameMenu(player, gamemodeId);
-            player.sendMessage("§aServer list refreshed!");
+            player.sendMessage(Component.text("Server list refreshed!", NamedTextColor.GREEN));
         }
     }
 
@@ -256,8 +313,6 @@ public class GameMenuManager {
 
         Inventory currentInventory = player.getOpenInventory().getTopInventory();
 
-        // In Paper 1.21.4+, we need to track menu ownership differently
-        // since getTitle() is deprecated. We use the openMenus map.
         if (!openMenus.containsKey(player.getUniqueId())) {
             return;
         }
@@ -267,13 +322,18 @@ public class GameMenuManager {
             currentInventory.setItem(i, null);
         }
 
-        // Re-add service items
+        // Re-add service items with updated slot mappings
         List<GameService> services = serviceManager.getServices(config.getId());
         int slot = 0;
         for (GameService service : services) {
             if (slot >= 45) break;
             ItemStack item = createServiceItem(service);
             currentInventory.setItem(slot, item);
+
+            // Update slot mapping
+            String slotKey = player.getUniqueId() + ":" + slot;
+            slotServiceMap.put(slotKey, service.getServiceName());
+
             slot++;
         }
 
@@ -285,6 +345,10 @@ public class GameMenuManager {
      */
     public void handleClose(@NotNull Player player) {
         openMenus.remove(player.getUniqueId());
+
+        // Clean up slot mappings for this player
+        String uuidPrefix = player.getUniqueId() + ":";
+        slotServiceMap.keySet().removeIf(key -> key.startsWith(uuidPrefix));
     }
 
     /**

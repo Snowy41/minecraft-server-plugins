@@ -53,6 +53,13 @@ public class FriendManager {
                 }
             });
         }, 6000L, 6000L); // 5 minutes
+
+        // NEW: Clean up invalid friend names on startup (runs once)
+        repository.cleanupInvalidFriendNames().thenAccept(count -> {
+            if (count > 0) {
+                plugin.getLogger().info("Fixed " + count + " invalid friend names in database");
+            }
+        });
     }
 
     /**

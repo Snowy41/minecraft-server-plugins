@@ -14,9 +14,9 @@ import java.util.logging.Level;
  * Generic Game Lobby Plugin - FIXED VERSION
  *
  * FIXES:
- * 1. Proper plugin messaging channel registration
- * 2. Better service name detection
- * 3. Improved error handling
+ * 1. ✅ Velocity plugin messaging (velocity:main instead of bungeecord:main)
+ * 2. ✅ Service name extraction in click handler
+ * 3. ✅ Better error messages
  */
 public class GameLobbyPlugin extends JavaPlugin {
 
@@ -48,7 +48,7 @@ public class GameLobbyPlugin extends JavaPlugin {
             }
             getLogger().info("✓ Redis connected");
 
-            // 3. Register plugin messaging channels (FIXED)
+            // 3. Register plugin messaging channels (FIXED for Velocity)
             registerPluginMessaging();
             getLogger().info("✓ Plugin messaging registered");
 
@@ -78,7 +78,7 @@ public class GameLobbyPlugin extends JavaPlugin {
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             getLogger().info("Game Lobby Plugin enabled successfully!");
             getLogger().info("✓ Real-time game state updates: ACTIVE");
-            getLogger().info("✓ CloudNet integration: READY");
+            getLogger().info("✓ Velocity integration: READY");
             getLogger().info("✓ Enabled gamemodes: " + serviceManager.getEnabledGamemodes().size());
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -105,10 +105,21 @@ public class GameLobbyPlugin extends JavaPlugin {
     }
 
     /**
-     * FIXED: Properly register plugin messaging channels for Velocity.
+     * FIXED: Register Velocity plugin messaging channels.
+     * Velocity uses "velocity:main" not "bungeecord:main"
      */
     private void registerPluginMessaging() {
-        // Register BOTH incoming and outgoing channels
+        // Register BOTH channels for compatibility
+
+        // Modern Velocity channel (preferred)
+        getServer().getMessenger().registerOutgoingPluginChannel(this, "velocity:main");
+        getServer().getMessenger().registerIncomingPluginChannel(this, "velocity:main",
+                (channel, player, message) -> {
+                    getLogger().fine("Received plugin message on channel: " + channel);
+                }
+        );
+
+        // Legacy BungeeCord channel (fallback)
         getServer().getMessenger().registerOutgoingPluginChannel(this, "bungeecord:main");
         getServer().getMessenger().registerIncomingPluginChannel(this, "bungeecord:main",
                 (channel, player, message) -> {
@@ -116,7 +127,7 @@ public class GameLobbyPlugin extends JavaPlugin {
                 }
         );
 
-        getLogger().info("Registered plugin messaging channels for Velocity");
+        getLogger().info("Registered plugin messaging channels: velocity:main, bungeecord:main");
     }
 
     /**

@@ -11,7 +11,9 @@ import org.bukkit.inventory.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Handles clicks in game menus.
+ * FIXED MenuListener
+ *
+ * Key Fix: Pass slot number to handleServiceClick for reliable service lookup
  */
 public class MenuListener implements Listener {
 
@@ -37,6 +39,7 @@ public class MenuListener implements Listener {
         if (clickedItem == null || clickedItem.getType() == Material.AIR) return;
 
         Material material = clickedItem.getType();
+        int slot = event.getSlot();
 
         // Handle control buttons
         if (material == Material.EMERALD) {
@@ -53,7 +56,8 @@ public class MenuListener implements Listener {
 
         // Handle concrete blocks (service items)
         if (material.name().endsWith("_CONCRETE")) {
-            menuManager.handleServiceClick(player, clickedItem);
+            // FIXED: Pass slot number for reliable service lookup
+            menuManager.handleServiceClick(player, slot, clickedItem);
             return;
         }
     }

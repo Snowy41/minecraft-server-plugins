@@ -291,16 +291,19 @@ public class GameServiceManager {
 
         if (service == null) {
             player.sendMessage("§cThat server is not available!");
+            plugin.getLogger().warning("Service not found: " + serviceName);
             return;
         }
 
         if (!service.isOnline()) {
             player.sendMessage("§cThat server is offline!");
+            plugin.getLogger().warning("Service offline: " + serviceName);
             return;
         }
 
         if (!service.isJoinable()) {
             player.sendMessage("§cYou cannot join that server right now!");
+            plugin.getLogger().warning("Service not joinable: " + serviceName + " (state: " + service.getState() + ")");
             return;
         }
 
@@ -312,11 +315,39 @@ public class GameServiceManager {
             out.writeUTF("Connect");
             out.writeUTF(serviceName);
 
-            player.sendPluginMessage(plugin, "bungeecord:main", b.toByteArray());
-            plugin.getLogger().info("Connecting " + player.getName() + " to " + serviceName);
+            byte[] data = b.toByteArray();
+
+            // Try Velocity channel first (modern)
+            boolean sent = false;
+            try {
+                player.sendPluginMessage(plugin, "velocity:main", data);
+                plugin.getLogger().info("Sent connection request to " + serviceName + " via velocity:main");
+                sent = true;
+            } catch (Exception e) {
+                plugin.getLogger().warning("Failed to send via velocity:main: " + e.getMessage());
+            }
+
+            // Fallback to BungeeCord channel
+            if (!sent) {
+                try {
+                    player.sendPluginMessage(plugin, "bungeecord:main", data);
+                    plugin.getLogger().info("Sent connection request to " + serviceName + " via bungeecord:main");
+                    sent = true;
+                } catch (Exception e) {
+                    plugin.getLogger().warning("Failed to send via bungeecord:main: " + e.getMessage());
+                }
+            }
+
+            if (sent) {
+                player.sendMessage("§aConnecting to " + serviceName + "...");
+                plugin.getLogger().info("Connecting " + player.getName() + " to " + serviceName);
+            } else {
+                player.sendMessage("§cFailed to connect to server!");
+                plugin.getLogger().severe("No plugin messaging channel worked for " + player.getName() + " -> " + serviceName);
+            }
 
         } catch (IOException e) {
-            plugin.getLogger().severe("Failed to connect player: " + e.getMessage());
+            plugin.getLogger().severe("Failed to create plugin message: " + e.getMessage());
             player.sendMessage("§cFailed to connect to server!");
         }
     }

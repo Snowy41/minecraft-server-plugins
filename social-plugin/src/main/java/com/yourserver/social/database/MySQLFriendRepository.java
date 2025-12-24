@@ -340,6 +340,102 @@ public class MySQLFriendRepository {
     }
 
     /**
+     * Cleans up invalid friend names in the database.
+     * Call this once on startup to fix existing data.
+     *
+     * Add this to MySQLFriendRepository.java
+     */
+    @NotNull
+    public CompletableFuture<Integer> cleanupInvalidFriendNames() {
+        return CompletableFuture.supplyAsync(() -> {
+            String selectSql = "SELECT player_uuid, friend_uuid, friend_name FROM social_friends WHERE friend_name REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'";
+            String updateSql = "UPDATE social_friends SET friend_name = ? WHERE player_uuid = ? AND friend_uuid = ?";
+
+            int fixedCount = 0;
+
+            try (Connection conn = dataSource.getConnection();
+                 PreparedStatement selectStmt = conn.prepareStatement(selectSql);
+                 PreparedStatement updateStmt = conn.prepareStatement(updateSql)) {
+
+                // Find all records with UUID-formatted names
+                ResultSet rs = selectStmt.executeQuery();
+
+                while (rs.next()) {
+                    String playerUuidStr = rs.getString("player_uuid");
+                    String friendUuidStr = rs.getString("friend_uuid");
+                    String currentName = rs.getString("friend_name");
+
+                    UUID friendUuid = UUID.fromString(friendUuidStr);
+
+                    // Try to get the correct name
+                    String correctName = getPlayerNameFromUUID(friendUuid);
+
+                    // If we got a valid name (not a UUID), update it
+                    if (!isUUID(correctName)) {
+                        updateStmt.setString(1, correctName);
+                        updateStmt.setString(2, playerUuidStr);
+                        updateStmt.setString(3, friendUuidStr);
+                        updateStmt.addBatch();
+                        fixedCount++;
+
+                        logger.info("Fixed friend name: " + currentName + " -> " + correctName);
+                    }
+                }
+
+                // Execute batch update
+                if (fixedCount > 0) {
+                    updateStmt.executeBatch();
+                    logger.info("Fixed " + fixedCount + " invalid friend names");
+                }
+
+                rs.close();
+
+            } catch (SQLException e) {
+                logger.log(Level.SEVERE, "Failed to cleanup friend names", e);
+            }
+
+            // Also clean up friend requests
+            try (Connection conn = dataSource.getConnection()) {
+                String cleanupRequestsSql = "UPDATE social_friend_requests SET from_name = ? WHERE from_uuid = ? AND from_name REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'";
+
+                String selectRequestsSql = "SELECT from_uuid, from_name FROM social_friend_requests WHERE from_name REGEXP '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'";
+
+                try (PreparedStatement selectStmt = conn.prepareStatement(selectRequestsSql);
+                     PreparedStatement updateStmt = conn.prepareStatement(cleanupRequestsSql)) {
+
+                    ResultSet rs = selectStmt.executeQuery();
+                    int requestsFixed = 0;
+
+                    while (rs.next()) {
+                        UUID fromUuid = UUID.fromString(rs.getString("from_uuid"));
+                        String correctName = getPlayerNameFromUUID(fromUuid);
+
+                        if (!isUUID(correctName)) {
+                            updateStmt.setString(1, correctName);
+                            updateStmt.setString(2, fromUuid.toString());
+                            updateStmt.addBatch();
+                            requestsFixed++;
+                        }
+                    }
+
+                    if (requestsFixed > 0) {
+                        updateStmt.executeBatch();
+                        logger.info("Fixed " + requestsFixed + " invalid friend request names");
+                        fixedCount += requestsFixed;
+                    }
+
+                    rs.close();
+                }
+
+            } catch (SQLException e) {
+                logger.log(Level.SEVERE, "Failed to cleanup friend request names", e);
+            }
+
+            return fixedCount;
+        }, executor);
+    }
+
+    /**
      * Gets a player's name from their UUID.
      * Tries online players first, then offline players.
      */

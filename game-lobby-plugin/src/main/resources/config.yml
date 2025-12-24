@@ -39,6 +39,10 @@ gamemodes:
     # Icon material for this gamemode
     icon-material: "DIAMOND_SWORD"
 
+    state-channel: "br:state"
+    heartbeat-channel: "br:heartbeat"
+    control-channel: "br:control"
+
     # Description (shown in help/info)
     description:
       - "§7Last player standing wins!"

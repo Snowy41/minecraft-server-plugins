@@ -104,6 +104,11 @@ public class GameServiceManager {
             String iconMaterialName = config.getString(path + ".icon-material", "DIAMOND_SWORD");
             List<String> description = config.getStringList(path + ".description");
 
+            // ADD THESE LINES - Read custom channels from config
+            String stateChannel = config.getString(path + ".state-channel", null);
+            String heartbeatChannel = config.getString(path + ".heartbeat-channel", null);
+            String controlChannel = config.getString(path + ".control-channel", null);
+
             Material iconMaterial;
             try {
                 iconMaterial = Material.valueOf(iconMaterialName.toUpperCase());
@@ -112,17 +117,33 @@ public class GameServiceManager {
                 iconMaterial = Material.DIAMOND_SWORD;
             }
 
-            GamemodeConfig gamemodeConfig = new GamemodeConfig.Builder()
+            // UPDATE THIS PART - Add custom channels to builder
+            GamemodeConfig.Builder builder = new GamemodeConfig.Builder()
                     .id(gamemodeId)
                     .displayName(displayName)
                     .servicePrefix(servicePrefix)
                     .iconMaterial(iconMaterial)
                     .description(description)
-                    .enabled(true)
-                    .build();
+                    .enabled(true);
+
+            // Set custom channels if provided in config
+            if (stateChannel != null) {
+                builder.stateChannel(stateChannel);
+            }
+            if (heartbeatChannel != null) {
+                builder.heartbeatChannel(heartbeatChannel);
+            }
+            if (controlChannel != null) {
+                builder.controlChannel(controlChannel);
+            }
+
+            GamemodeConfig gamemodeConfig = builder.build();
 
             gamemodes.put(gamemodeId, gamemodeConfig);
             plugin.getLogger().info("  ✓ Loaded: " + gamemodeId + " (" + displayName + ")");
+            // ADD THIS LINE - Log which channels are being used
+            plugin.getLogger().info("    Channels: " + gamemodeConfig.getStateChannel() +
+                    ", " + gamemodeConfig.getHeartbeatChannel());
         }
 
         plugin.getLogger().info("Loaded " + gamemodes.size() + " gamemode(s)");

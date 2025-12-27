@@ -40,9 +40,7 @@ public class BattleRoyaleDebugCommand implements CommandExecutor, TabCompleter {
     public BattleRoyaleDebugCommand(BattleRoyalePlugin plugin, GameManager gameManager) {
         this.plugin = plugin;
         this.gameManager = gameManager;
-    }
-
-    @Override
+    }@Override
     public boolean onCommand(
             @NotNull CommandSender sender,
             @NotNull Command command,

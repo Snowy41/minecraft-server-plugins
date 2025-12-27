@@ -2,21 +2,21 @@ package com.yourserver.gamelobby;
 
 import com.yourserver.core.CorePlugin;
 import com.yourserver.gamelobby.command.GameMenuCommand;
+import com.yourserver.gamelobby.command.VelocityTestCommand;
 import com.yourserver.gamelobby.listener.MenuListener;
 import com.yourserver.gamelobby.manager.GameMenuManager;
 import com.yourserver.gamelobby.manager.GameServiceManager;
 import org.bukkit.plugin.java.JavaPlugin;
-import org.bukkit.plugin.messaging.PluginMessageListener;
 
 import java.util.logging.Level;
 
 /**
- * Generic Game Lobby Plugin - FIXED VERSION
+ * Generic Game Lobby Plugin - Velocity Edition with Debug Command
  *
- * FIXES:
- * 1. ✅ Velocity plugin messaging (velocity:main instead of bungeecord:main)
- * 2. ✅ Service name extraction in click handler
- * 3. ✅ Better error messages
+ * UPDATED:
+ * 1. ✅ Uses velocity:main channel (modern)
+ * 2. ✅ Proper channel registration
+ * 3. ✅ VelocityTestCommand registered for debugging
  */
 public class GameLobbyPlugin extends JavaPlugin {
 
@@ -48,9 +48,9 @@ public class GameLobbyPlugin extends JavaPlugin {
             }
             getLogger().info("✓ Redis connected");
 
-            // 3. Register plugin messaging channels (FIXED for Velocity)
-            registerPluginMessaging();
-            getLogger().info("✓ Plugin messaging registered");
+            // 3. Register plugin messaging channels for Velocity
+            registerVelocityMessaging();
+            getLogger().info("✓ Velocity plugin messaging registered");
 
             // 4. Initialize service manager
             serviceManager = new GameServiceManager(this, corePlugin);
@@ -70,6 +70,7 @@ public class GameLobbyPlugin extends JavaPlugin {
 
             // 7. Register commands
             registerGameCommands();
+            registerDebugCommands();
             getLogger().info("✓ Commands registered");
 
             // 8. Log enabled gamemodes
@@ -78,7 +79,8 @@ public class GameLobbyPlugin extends JavaPlugin {
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             getLogger().info("Game Lobby Plugin enabled successfully!");
             getLogger().info("✓ Real-time game state updates: ACTIVE");
-            getLogger().info("✓ Velocity integration: READY");
+            getLogger().info("✓ Velocity modern messaging: ENABLED");
+            getLogger().info("✓ Debug command: /velocitytest <server>");
             getLogger().info("✓ Enabled gamemodes: " + serviceManager.getEnabledGamemodes().size());
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
 
@@ -105,29 +107,23 @@ public class GameLobbyPlugin extends JavaPlugin {
     }
 
     /**
-     * FIXED: Register Velocity plugin messaging channels.
-     * Velocity uses "velocity:main" not "bungeecord:main"
+     * Register modern Velocity plugin messaging channels.
      */
-    private void registerPluginMessaging() {
-        // Register BOTH channels for compatibility
+    private void registerVelocityMessaging() {
+        getLogger().info("Registering Velocity plugin messaging channels...");
 
-        // Modern Velocity channel (preferred)
-        getServer().getMessenger().registerOutgoingPluginChannel(this, "velocity:main");
-        getServer().getMessenger().registerIncomingPluginChannel(this, "velocity:main",
-                (channel, player, message) -> {
-                    getLogger().fine("Received plugin message on channel: " + channel);
-                }
-        );
-
-        // Legacy BungeeCord channel (fallback)
+        // BungeeCord channel (for Velocity with bungee-plugin-message-channel = true)
         getServer().getMessenger().registerOutgoingPluginChannel(this, "bungeecord:main");
+        getLogger().info("  ✓ Registered outgoing: bungeecord:main");
+
         getServer().getMessenger().registerIncomingPluginChannel(this, "bungeecord:main",
                 (channel, player, message) -> {
-                    getLogger().fine("Received plugin message on channel: " + channel);
+                    getLogger().fine("Received message on bungeecord:main channel");
                 }
         );
+        getLogger().info("  ✓ Registered incoming: bungeecord:main");
 
-        getLogger().info("Registered plugin messaging channels: velocity:main, bungeecord:main");
+        getLogger().info("Plugin messaging registration complete!");
     }
 
     /**
@@ -142,6 +138,16 @@ public class GameLobbyPlugin extends JavaPlugin {
 
             getLogger().info("  Registered command: /" + gamemode);
         }
+    }
+
+    /**
+     * Registers debug commands.
+     */
+    private void registerDebugCommands() {
+        // Register VelocityTest command
+        VelocityTestCommand velocityTestCommand = new VelocityTestCommand(this);
+        getCommand("velocitytest").setExecutor(velocityTestCommand);
+        getLogger().info("  Registered debug command: /velocitytest");
     }
 
     /**

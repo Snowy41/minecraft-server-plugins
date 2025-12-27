@@ -13,44 +13,51 @@ softdepend:
   - APIModule
 
 # Commands are dynamically registered based on config.yml
-# Examples: /battleroyale, /skywars, /bedwars, etc.
 commands:
   battleroyale:
     description: Open BattleRoyale server menu
     usage: /<command>
     aliases: [br]
     permission: gamelobby.use.battleroyale
-  
+
   skywars:
     description: Open SkyWars server menu
     usage: /<command>
     aliases: [sw]
     permission: gamelobby.use.skywars
-  
+
   bedwars:
     description: Open BedWars server menu
     usage: /<command>
     aliases: [bw]
     permission: gamelobby.use.bedwars
-  
+
   duels:
     description: Open Duels server menu
     usage: /<command>
     permission: gamelobby.use.duels
-  
+
   murder:
     description: Open The Murder server menu
     usage: /<command>
     permission: gamelobby.use.murder
 
+  # Debug command for testing Velocity connections
+  velocitytest:
+    description: Test Velocity connection to a server
+    usage: /<command> <server>
+    permission: gamelobby.admin
+    aliases: [vtest, testconnection]
+
 # Permissions
 permissions:
   gamelobby.*:
     description: All GameLobby permissions
-    default: true
+    default: op
     children:
       gamelobby.use.*: true
-  
+      gamelobby.admin: true
+
   gamelobby.use.*:
     description: Access to all gamemode menus
     default: true
@@ -60,23 +67,27 @@ permissions:
       gamelobby.use.bedwars: true
       gamelobby.use.duels: true
       gamelobby.use.murder: true
-  
+
   gamelobby.use.battleroyale:
     description: Use BattleRoyale menu
     default: true
-  
+
   gamelobby.use.skywars:
     description: Use SkyWars menu
     default: true
-  
+
   gamelobby.use.bedwars:
     description: Use BedWars menu
     default: true
-  
+
   gamelobby.use.duels:
     description: Use Duels menu
     default: true
-  
+
   gamelobby.use.murder:
     description: Use The Murder menu
     default: true
+
+  gamelobby.admin:
+    description: Admin commands (debug, test)
+    default: op

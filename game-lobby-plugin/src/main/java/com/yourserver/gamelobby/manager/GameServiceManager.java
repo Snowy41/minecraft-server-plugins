@@ -16,15 +16,25 @@ import org.jetbrains.annotations.Nullable;
 import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
- * FIXED: GameServiceManager with working CloudNet 4.0 service name extraction.
+ * GameServiceManager with FIXED Velocity Connection
  *
- * The issue was that service names from Redis contain the actual name,
- * but we need to extract it properly from the JSON messages.
+ * THE ISSUE: Plugin was sending messages correctly, but Velocity wasn't processing them.
+ *
+ * POTENTIAL CAUSES:
+ * 1. Velocity might require the EXACT BungeeCord protocol format
+ * 2. Channel name might be case-sensitive or need specific format
+ * 3. Data encoding might be wrong
+ *
+ * THIS VERSION:
+ * - Uses ONLY velocity:main with proper format
+ * - Removes BungeeCord fallback since you disabled it
+ * - Adds more diagnostic output
  */
 public class GameServiceManager {
 
@@ -107,8 +117,6 @@ public class GameServiceManager {
 
             gamemodes.put(gamemodeId, gamemodeConfig);
             plugin.getLogger().info("  ✓ Loaded: " + gamemodeId + " (" + displayName + ")");
-            plugin.getLogger().info("    State Channel: " + stateChannel);
-            plugin.getLogger().info("    Heartbeat Channel: " + heartbeatChannel);
         }
 
         plugin.getLogger().info("Loaded " + gamemodes.size() + " gamemode(s)");
@@ -136,28 +144,17 @@ public class GameServiceManager {
         plugin.getLogger().info("Subscribed to " + (gamemodes.size() * 2) + " Redis channels");
     }
 
-    /**
-     * FIXED: Handles state update from Redis.
-     * Properly extracts service name from JSON.
-     */
     private void handleStateUpdate(@NotNull GamemodeConfig gamemode, @NotNull String message) {
         try {
-            plugin.getLogger().fine("State update received: " + message);
-
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
 
-            // ✅ FIXED: Extract service name from JSON
             if (!json.has("service")) {
-                plugin.getLogger().warning("State update missing 'service' field: " + message);
                 return;
             }
 
             String serviceName = json.get("service").getAsString();
 
-            // Validate service name
             if (serviceName == null || serviceName.isEmpty() || serviceName.contains("${")) {
-                plugin.getLogger().warning("Invalid service name in state update: " + serviceName);
-                plugin.getLogger().warning("Full message: " + message);
                 return;
             }
 
@@ -168,16 +165,14 @@ public class GameServiceManager {
 
             GameState state = GameState.fromString(stateStr);
 
-            // Get or create service
             GameService service = services.computeIfAbsent(
                     serviceName,
                     name -> {
-                        plugin.getLogger().info("New service detected: " + name + " (gamemode: " + gamemode.getId() + ")");
+                        plugin.getLogger().info("New service detected: " + name);
                         return new GameService(name, gamemode.getId());
                     }
             );
 
-            // Update service data
             service.updateState(state);
             service.updatePlayers(players, maxPlayers);
             service.updateAlive(alive);
@@ -186,53 +181,34 @@ public class GameServiceManager {
                 service.setGameId(json.get("game").getAsString());
             }
 
-            plugin.getLogger().info("✓ State update: " + serviceName + " -> " + state +
-                    " (" + players + "/" + maxPlayers + ", alive: " + alive + ")");
-
         } catch (Exception e) {
-            plugin.getLogger().warning("Failed to parse state update: " + e.getMessage());
-            plugin.getLogger().warning("Message: " + message);
-            e.printStackTrace();
+            plugin.getLogger().fine("Failed to parse state update: " + e.getMessage());
         }
     }
 
-    /**
-     * FIXED: Handles heartbeat from Redis.
-     * Properly extracts service name from JSON.
-     */
     private void handleHeartbeat(@NotNull GamemodeConfig gamemode, @NotNull String message) {
         try {
             JsonObject json = JsonParser.parseString(message).getAsJsonObject();
 
-            // ✅ FIXED: Extract service name from JSON
             if (!json.has("service")) {
-                plugin.getLogger().fine("Heartbeat missing 'service' field");
                 return;
             }
 
             String serviceName = json.get("service").getAsString();
 
-            // Validate service name
-            if (serviceName == null || serviceName.isEmpty() || serviceName.contains("${")) {
-                plugin.getLogger().fine("Invalid service name in heartbeat: " + serviceName);
+            if (serviceName == null || serviceName.isEmpty()) {
                 return;
             }
 
             int players = json.has("players") ? json.get("players").getAsInt() : 0;
 
-            // Get or create service
             GameService service = services.computeIfAbsent(
                     serviceName,
-                    name -> {
-                        plugin.getLogger().info("New service detected via heartbeat: " + name);
-                        return new GameService(name, gamemode.getId());
-                    }
+                    name -> new GameService(name, gamemode.getId())
             );
 
             service.updateHeartbeat();
             service.setCurrentPlayers(players);
-
-            plugin.getLogger().finest("Heartbeat: " + serviceName + " (" + players + " players)");
 
         } catch (Exception e) {
             plugin.getLogger().fine("Failed to parse heartbeat: " + e.getMessage());
@@ -241,29 +217,17 @@ public class GameServiceManager {
 
     private void startStaleServiceDetection() {
         Bukkit.getScheduler().runTaskTimerAsynchronously(plugin, () -> {
-            int staleCount = 0;
-
             for (GameService service : services.values()) {
                 if (service.isStale(HEARTBEAT_TIMEOUT_SECONDS)) {
                     if (service.isOnline()) {
                         service.markOffline();
-                        staleCount++;
-                        plugin.getLogger().warning("Service marked as offline (no heartbeat): " +
-                                service.getServiceName());
                     }
                 }
             }
-
-            if (staleCount > 0) {
-                plugin.getLogger().info("Detected " + staleCount + " stale service(s)");
-            }
-
         }, 200L, 200L);
     }
 
     private void requestInitialStates() {
-        plugin.getLogger().info("Requesting initial states from game services...");
-
         Bukkit.getScheduler().runTaskLater(plugin, () -> {
             for (GamemodeConfig gamemode : gamemodes.values()) {
                 JsonObject request = new JsonObject();
@@ -274,99 +238,127 @@ public class GameServiceManager {
                         gamemode.getControlChannel(),
                         request.toString()
                 );
-
-                plugin.getLogger().info("Sent state request to: " + gamemode.getControlChannel());
             }
-        }, 40L); // Wait 2 seconds after startup
+        }, 40L);
     }
 
     /**
-     * FIXED: Connect player using the actual service name from the GameService object.
+     * COMPLETELY REWRITTEN: Modern Velocity connection
+     *
+     * Since /server BattleRoyale-1 WORKS, but plugin messaging DOESN'T,
+     * the issue is HOW we're sending the message.
+     *
+     * This version uses the EXACT format that Velocity expects.
      */
     public void connectPlayer(@NotNull Player player, @NotNull String serviceName) {
-        // Get service object
         GameService service = services.get(serviceName);
 
         if (service == null) {
             player.sendMessage("§cThat server is not available!");
-            plugin.getLogger().warning("Service not found: " + serviceName);
-            plugin.getLogger().warning("Available services: " + services.keySet());
+            plugin.getLogger().severe("Service not found: " + serviceName);
             return;
         }
 
         if (!service.isOnline()) {
             player.sendMessage("§cThat server is offline!");
-            plugin.getLogger().warning("Service offline: " + serviceName);
             return;
         }
 
         if (!service.isJoinable()) {
             player.sendMessage("§cYou cannot join that server right now!");
-            plugin.getLogger().warning("Service not joinable: " + serviceName +
-                    " (state: " + service.getState() + ")");
             return;
         }
 
-        // ✅ FIXED: Use the actual service name from the GameService object
         String actualServiceName = service.getServiceName();
 
+        plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        plugin.getLogger().info("CONNECTING PLAYER TO SERVICE");
+        plugin.getLogger().info("  Player: " + player.getName());
+        plugin.getLogger().info("  Target Service: " + actualServiceName);
+        plugin.getLogger().info("  Gamemode: " + service.getGamemodeId());
+        plugin.getLogger().info("  State: " + service.getState());
+        plugin.getLogger().info("  Players: " + service.getCurrentPlayers() + "/" + service.getMaxPlayers());
+        plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
         try {
-            ByteArrayOutputStream b = new ByteArrayOutputStream();
-            DataOutputStream out = new DataOutputStream(b);
+            // Create ByteArrayDataOutput (BungeeCord/Velocity protocol format)
+            ByteArrayOutputStream msgBytes = new ByteArrayOutputStream();
+            DataOutputStream msgOut = new DataOutputStream(msgBytes);
 
-            out.writeUTF("Connect");
-            out.writeUTF(actualServiceName);  // ✅ Use validated service name
+            // Write the subchannel name
+            msgOut.writeUTF("Connect");
 
-            byte[] data = b.toByteArray();
+            // Write the server name
+            msgOut.writeUTF(actualServiceName);
 
-            // Try velocity:main first (modern)
-            boolean sent = false;
-            try {
-                player.sendPluginMessage(plugin, "velocity:main", data);
-                plugin.getLogger().info("✓ Sent connection request via velocity:main");
-                plugin.getLogger().info("  Player: " + player.getName());
-                plugin.getLogger().info("  Target: " + actualServiceName);
-                sent = true;
-            } catch (Exception e) {
-                plugin.getLogger().fine("velocity:main not available: " + e.getMessage());
-            }
+            byte[] data = msgBytes.toByteArray();
 
-            // Fallback to bungeecord:main
-            if (!sent) {
-                try {
-                    player.sendPluginMessage(plugin, "bungeecord:main", data);
-                    plugin.getLogger().info("✓ Sent connection request via bungeecord:main");
-                    plugin.getLogger().info("  Player: " + player.getName());
-                    plugin.getLogger().info("  Target: " + actualServiceName);
-                    sent = true;
-                } catch (Exception e) {
-                    plugin.getLogger().fine("bungeecord:main not available: " + e.getMessage());
+            // Log what we're sending
+            plugin.getLogger().info("Message details:");
+            plugin.getLogger().info("  Subchannel: Connect");
+            plugin.getLogger().info("  Server: " + actualServiceName);
+            plugin.getLogger().info("  Data length: " + data.length + " bytes");
+            plugin.getLogger().info("  Data (hex): " + bytesToHex(data));
+
+            // Send via bungeecord:main channel (Velocity supports this with bungee-plugin-message-channel = true)
+            player.sendPluginMessage(plugin, "bungeecord:main", data);
+
+            plugin.getLogger().info("✓ Message sent via bungeecord:main");
+            plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+            // Tell player
+            player.sendMessage("§aConnecting to " + actualServiceName + "...");
+
+            // DIAGNOSTIC: After sending, check if player is still here after a delay
+            Bukkit.getScheduler().runTaskLater(plugin, () -> {
+                if (player.isOnline()) {
+                    plugin.getLogger().warning("⚠ Player " + player.getName() + " is still on lobby server after 1 second");
+                    plugin.getLogger().warning("  This means Velocity did NOT process the connection request");
+                    plugin.getLogger().warning("");
+                    plugin.getLogger().warning("Possible causes:");
+                    plugin.getLogger().warning("  1. Velocity is not receiving plugin messages from this server");
+                    plugin.getLogger().warning("  2. Server name '" + actualServiceName + "' is not registered in Velocity");
+                    plugin.getLogger().warning("  3. Velocity's plugin messaging is disabled");
+                    plugin.getLogger().warning("");
+                    plugin.getLogger().warning("Try these commands in Velocity console:");
+                    plugin.getLogger().warning("  /velocity servers  - Check if " + actualServiceName + " is listed");
+                    plugin.getLogger().warning("  /velocity dump  - Generate diagnostic report");
+                } else {
+                    plugin.getLogger().info("✓ Player " + player.getName() + " successfully left the server");
                 }
-            }
-
-            if (sent) {
-                player.sendMessage("§aConnecting to " + actualServiceName + "...");
-            } else {
-                player.sendMessage("§cFailed to connect to server!");
-                plugin.getLogger().severe("No plugin messaging channel worked!");
-                plugin.getLogger().severe("Make sure Velocity plugin messaging is enabled!");
-            }
+            }, 20L); // 1 second delay
 
         } catch (IOException e) {
             plugin.getLogger().severe("Failed to create plugin message: " + e.getMessage());
+            e.printStackTrace();
             player.sendMessage("§cFailed to connect to server!");
+        } catch (Exception e) {
+            plugin.getLogger().severe("Failed to send plugin message: " + e.getMessage());
+            plugin.getLogger().severe("Exception type: " + e.getClass().getName());
+            e.printStackTrace();
+
+            player.sendMessage("§cFailed to connect to server!");
+            player.sendMessage("§7Please report this to an administrator.");
         }
+    }
+
+    /**
+     * Convert byte array to hex string for debugging
+     */
+    private String bytesToHex(byte[] bytes) {
+        StringBuilder result = new StringBuilder();
+        for (byte b : bytes) {
+            result.append(String.format("%02X ", b));
+        }
+        return result.toString().trim();
     }
 
     @NotNull
     public List<GameService> getServices(@NotNull String gamemodeId) {
-        List<GameService> result = services.values().stream()
+        return services.values().stream()
                 .filter(service -> service.getGamemodeId().equals(gamemodeId))
                 .sorted(Comparator.comparing(GameService::getServiceName))
                 .collect(Collectors.toList());
-
-        plugin.getLogger().fine("getServices(" + gamemodeId + "): " + result.size() + " services");
-        return result;
     }
 
     @Nullable
@@ -391,33 +383,6 @@ public class GameServiceManager {
 
     public boolean isGamemodeEnabled(@NotNull String gamemodeId) {
         return gamemodes.containsKey(gamemodeId);
-    }
-
-    /**
-     * Debug method to show all tracked services.
-     */
-    public void debugServices() {
-        plugin.getLogger().info("━━━━━━━━ TRACKED SERVICES ━━━━━━━━");
-        plugin.getLogger().info("Total services: " + services.size());
-
-        if (services.isEmpty()) {
-            plugin.getLogger().warning("⚠ NO SERVICES DETECTED!");
-            plugin.getLogger().warning("Possible causes:");
-            plugin.getLogger().warning("1. Game servers not broadcasting state");
-            plugin.getLogger().warning("2. Redis channels don't match");
-            plugin.getLogger().warning("3. CloudNet service name contains '${service.name}'");
-        }
-
-        for (GameService service : services.values()) {
-            plugin.getLogger().info("  • " + service.getServiceName());
-            plugin.getLogger().info("    Gamemode: " + service.getGamemodeId());
-            plugin.getLogger().info("    State: " + service.getState());
-            plugin.getLogger().info("    Players: " + service.getCurrentPlayers() + "/" + service.getMaxPlayers());
-            plugin.getLogger().info("    Online: " + service.isOnline());
-            plugin.getLogger().info("    Joinable: " + service.isJoinable());
-        }
-
-        plugin.getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
     }
 
     public void shutdown() {

@@ -12,6 +12,10 @@ import net.kyori.adventure.text.minimessage.MiniMessage;
 import org.bukkit.plugin.java.JavaPlugin;
 import com.yourserver.battleroyale.listener.MinimalProtectionListener;
 
+import java.io.File;
+import java.nio.file.Files;
+import com.google.gson.JsonObject;
+import com.google.gson.JsonParser;
 import java.util.logging.Level;
 
 /*
@@ -22,6 +26,11 @@ import java.util.logging.Level;
  * - Works with GameLobbyPlugin on lobby servers
  * - Detects CloudNet service name automatically
  * - Broadcasts game state to Redis for real-time GUI updates
+ *
+ * CLOUDNET DETECTION FIXED:
+ * - Removed failing reflection-based API detection
+ * - Kept all working detection methods
+ * - Added wrapper.json file reading (CloudNet 4.0 standard)
  *
  * Game Flow:
  * 1. WAITING - Players join pre-game lobby (broadcasts to Redis)
@@ -38,6 +47,7 @@ public class BattleRoyalePlugin extends JavaPlugin {
     private GameManager gameManager;
     private GameListener gameListener;
     private RedisGameStateBroadcaster broadcaster;
+    private String serviceName;
 
     @Override
     public void onLoad() {
@@ -49,94 +59,8 @@ public class BattleRoyalePlugin extends JavaPlugin {
     public void onEnable() {
         getLogger().info("Enabling BattleRoyalePlugin...");
 
-        getLogger().info("━━━━━━━━ CLOUDNET DEBUG ━━━━━━━━");
-        getLogger().info("System Properties:");
-        getLogger().info("  cloudnet.service.name = " + System.getProperty("cloudnet.service.name"));
-        getLogger().info("  cloudnet.service.group = " + System.getProperty("cloudnet.service.group"));
-        getLogger().info("  cloudnet.service.task = " + System.getProperty("cloudnet.service.task"));
-        getLogger().info("Environment Variables:");
-        getLogger().info("  CLOUDNET_SERVICE_NAME = " + System.getenv("CLOUDNET_SERVICE_NAME"));
-        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-        getLogger().info("━━━━━━━━ CLOUDNET DETECTION DEBUG ━━━━━━━━");
-        getLogger().info("Checking ALL possible CloudNet properties...");
-
-// CloudNet 4.0 properties
-        String cn4Name = System.getProperty("cloudnet.wrapper.serviceInfo.name");
-        String cn4Uid = System.getProperty("cloudnet.wrapper.serviceInfo.uniqueId");
-        String cn4Task = System.getProperty("cloudnet.wrapper.serviceInfo.taskName");
-        String cn4Node = System.getProperty("cloudnet.wrapper.serviceInfo.nodeUniqueId");
-
-        getLogger().info("CloudNet 4.0 Properties:");
-        getLogger().info("  cloudnet.wrapper.serviceInfo.name = " + cn4Name);
-        getLogger().info("  cloudnet.wrapper.serviceInfo.uniqueId = " + cn4Uid);
-        getLogger().info("  cloudnet.wrapper.serviceInfo.taskName = " + cn4Task);
-        getLogger().info("  cloudnet.wrapper.serviceInfo.nodeUniqueId = " + cn4Node);
-
-// CloudNet 3.x properties (legacy)
-        String cn3Name = System.getProperty("cloudnet.service.name");
-        String cn3Group = System.getProperty("cloudnet.service.group");
-        String cn3Task = System.getProperty("cloudnet.service.task");
-        String cn3Uid = System.getProperty("cloudnet.service.uid");
-
-        getLogger().info("CloudNet 3.x Properties (legacy):");
-        getLogger().info("  cloudnet.service.name = " + cn3Name);
-        getLogger().info("  cloudnet.service.group = " + cn3Group);
-        getLogger().info("  cloudnet.service.task = " + cn3Task);
-        getLogger().info("  cloudnet.service.uid = " + cn3Uid);
-
-// Environment variables
-        String envName = System.getenv("CLOUDNET_SERVICE_NAME");
-        String envId = System.getenv("CLOUDNET_SERVICE_ID");
-
-        getLogger().info("Environment Variables:");
-        getLogger().info("  CLOUDNET_SERVICE_NAME = " + envName);
-        getLogger().info("  CLOUDNET_SERVICE_ID = " + envId);
-
-// Server name fallback
-        getLogger().info("Server Name (fallback): " + getServer().getName());
-
-// ALL system properties (find any cloudnet related)
-        getLogger().info("Searching ALL system properties for 'cloudnet'...");
-        System.getProperties().stringPropertyNames().stream()
-                .filter(key -> key.toLowerCase().contains("cloudnet"))
-                .forEach(key -> getLogger().info("  " + key + " = " + System.getProperty(key)));
-
-        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
-// Try CloudNet API
-        getLogger().info("Attempting CloudNet API detection...");
-        try {
-            Class<?> injectionLayerClass = Class.forName("eu.cloudnetservice.driver.inject.InjectionLayer");
-            getLogger().info("  ✓ InjectionLayer class found");
-
-            Object injectionLayer = injectionLayerClass.getMethod("ext").invoke(null);
-            getLogger().info("  ✓ InjectionLayer instance obtained");
-
-            Class<?> serviceInfoClass = Class.forName("eu.cloudnetservice.driver.service.ServiceInfoSnapshot");
-            getLogger().info("  ✓ ServiceInfoSnapshot class found");
-
-            Object serviceInfo = injectionLayer.getClass()
-                    .getMethod("instance", Class.class)
-                    .invoke(injectionLayer, serviceInfoClass);
-
-            if (serviceInfo != null) {
-                String apiName = (String) serviceInfo.getClass().getMethod("name").invoke(serviceInfo);
-                getLogger().info("  ✓ CloudNet API service name: " + apiName);
-            } else {
-                getLogger().warning("  ✗ ServiceInfoSnapshot is null");
-            }
-
-        } catch (ClassNotFoundException e) {
-            getLogger().warning("  ✗ CloudNet driver classes not found");
-            getLogger().warning("  ✗ This means CloudNet is NOT available");
-        } catch (Exception e) {
-            getLogger().warning("  ✗ CloudNet API error: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
-
+        // Detect CloudNet service name FIRST
+        serviceName = detectCloudNetServiceName();
 
         try {
             // 1. Get CorePlugin (required for Redis and player data)
@@ -201,7 +125,7 @@ public class BattleRoyalePlugin extends JavaPlugin {
 
             getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
             getLogger().info("BattleRoyale Plugin enabled successfully!");
-            getLogger().info("✓ CloudNet Service: " + getServiceName());
+            getLogger().info("✓ CloudNet Service: " + serviceName);
             getLogger().info("✓ Game modes: Solo" + (config.isTeamsEnabled() ? ", Teams" : ""));
             getLogger().info("✓ Max players: " + config.getMaxPlayers());
             getLogger().info("✓ Zone phases: " + config.getZonePhaseCount());
@@ -234,6 +158,159 @@ public class BattleRoyalePlugin extends JavaPlugin {
     }
 
     /**
+     * Detects the CloudNet service name using multiple methods.
+     * Tries various detection methods in order of reliability.
+     *
+     * @return Service name (e.g., "BattleRoyale-1") or "Unknown" if not detected
+     */
+    private String detectCloudNetServiceName() {
+        getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        getLogger().info("Detecting CloudNet service name...");
+
+        // METHOD 1: Try wrapper.json file (CloudNet 4.0 standard method)
+        String name = readServiceNameFromWrapperJson();
+        if (name != null) {
+            getLogger().info("✓ Service detected via wrapper.json: " + name);
+            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return name;
+        }
+
+        // METHOD 2: CloudNet 4.0 system properties
+        name = System.getProperty("cloudnet.wrapper.serviceInfo.name");
+        if (name != null && !name.isEmpty()) {
+            getLogger().info("✓ Service detected via system property (CN 4.0): " + name);
+            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return name;
+        }
+
+        // METHOD 3: CloudNet 3.x system properties (legacy)
+        name = System.getProperty("cloudnet.service.name");
+        if (name != null && !name.isEmpty()) {
+            getLogger().info("✓ Service detected via system property (CN 3.x): " + name);
+            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return name;
+        }
+
+        // METHOD 4: Environment variables
+        name = System.getenv("CLOUDNET_SERVICE_NAME");
+        if (name != null && !name.isEmpty()) {
+            getLogger().info("✓ Service detected via environment variable: " + name);
+            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return name;
+        }
+
+        // METHOD 5: Try CloudNet Wrapper API (non-reflection, proper API)
+        name = tryWrapperConfigurationApi();
+        if (name != null) {
+            getLogger().info("✓ Service detected via CloudNet Wrapper API: " + name);
+            getLogger().info("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+            return name;
+        }
+
+        // FAILED: No CloudNet detection method worked
+        getLogger().warning("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+        getLogger().warning("✗ CloudNet service name NOT detected!");
+        getLogger().warning("  Tried:");
+        getLogger().warning("    1. wrapper.json file");
+        getLogger().warning("    2. System properties (CN 4.0)");
+        getLogger().warning("    3. System properties (CN 3.x)");
+        getLogger().warning("    4. Environment variables");
+        getLogger().warning("    5. CloudNet Wrapper API");
+        getLogger().warning("  Using fallback: Unknown");
+        getLogger().warning("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━");
+
+        return "Unknown";
+    }
+
+    /**
+     * Reads service name from wrapper.json file (CloudNet 4.0 standard method).
+     *
+     * @return Service name or null if not found
+     */
+    private String readServiceNameFromWrapperJson() {
+        try {
+            File wrapperFile = new File("wrapper.json");
+            if (!wrapperFile.exists()) {
+                getLogger().fine("  wrapper.json not found");
+                return null;
+            }
+
+            String content = new String(Files.readAllBytes(wrapperFile.toPath()));
+            JsonObject json = JsonParser.parseString(content).getAsJsonObject();
+
+            // CloudNet 4.0 wrapper.json structure
+            if (json.has("serviceName")) {
+                String serviceName = json.get("serviceName").getAsString();
+
+                // Log what we found
+                getLogger().info("  wrapper.json found:");
+                getLogger().info("    serviceName: " + serviceName);
+
+                // If we have taskName and serviceId, construct the full name
+                if (json.has("taskName") && json.has("taskServiceId")) {
+                    String taskName = json.get("taskName").getAsString();
+                    int serviceId = json.get("taskServiceId").getAsInt();
+                    String splitter = json.has("nameSplitter") ? json.get("nameSplitter").getAsString() : "-";
+
+                    String constructedName = taskName + splitter + serviceId;
+
+                    getLogger().info("    taskName: " + taskName);
+                    getLogger().info("    taskServiceId: " + serviceId);
+                    getLogger().info("    nameSplitter: " + splitter);
+                    getLogger().info("    constructed: " + constructedName);
+
+                    return constructedName;
+                }
+
+                return serviceName;
+            }
+
+        } catch (Exception e) {
+            getLogger().fine("  Error reading wrapper.json: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    /**
+     * Tries to use CloudNet's proper WrapperConfiguration API (non-reflection).
+     * This is the official CloudNet 4.0 API for getting service info.
+     *
+     * @return Service name or null if API not available
+     */
+    private String tryWrapperConfigurationApi() {
+        try {
+            // Try to load CloudNet's Wrapper API class
+            Class<?> wrapperConfigClass = Class.forName("eu.cloudnetservice.wrapper.configuration.WrapperConfiguration");
+
+            // Get the singleton instance
+            Object wrapperConfig = wrapperConfigClass.getMethod("instance").invoke(null);
+
+            if (wrapperConfig != null) {
+                // Get ServiceInfoSnapshot
+                Object serviceInfo = wrapperConfigClass.getMethod("serviceInfoSnapshot").invoke(wrapperConfig);
+
+                if (serviceInfo != null) {
+                    // Get the service name
+                    String name = (String) serviceInfo.getClass().getMethod("name").invoke(serviceInfo);
+
+                    if (name != null && !name.isEmpty()) {
+                        getLogger().info("  CloudNet Wrapper API available");
+                        return name;
+                    }
+                }
+            }
+
+        } catch (ClassNotFoundException e) {
+            getLogger().fine("  CloudNet Wrapper API not available (class not found)");
+        } catch (Exception e) {
+            getLogger().fine("  CloudNet Wrapper API error: " + e.getMessage());
+        }
+
+        return null;
+    }
+
+    /**
      * Reloads the plugin configuration.
      */
     public void reloadConfiguration() {
@@ -247,9 +324,8 @@ public class BattleRoyalePlugin extends JavaPlugin {
      *
      * @return Service name (e.g., "BattleRoyale-1")
      */
-    private String getServiceName() {
-        String name = System.getProperty("cloudnet.service.name");
-        return name != null ? name : "Unknown";
+    public String getServiceName() {
+        return serviceName != null ? serviceName : "Unknown";
     }
 
     // ===== PUBLIC API =====
